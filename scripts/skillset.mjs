@@ -5,9 +5,10 @@ import path from 'node:path';
 import { inventory, oneLine, paths } from './lib/inventory.mjs';
 import { FILE, TIERABLE, TIERS, apply, digest, moveItems, parse, reconcile, render, summarize } from './lib/tiers.mjs';
 import { dismiss } from './lib/session.mjs';
-import { check, pending, readState, skip, writeState } from './lib/updates.mjs';
+import { check, passDue, pending, readState, skip, stampPass, writeState } from './lib/updates.mjs';
 import { report, scan } from './lib/scan.mjs';
 import { startServer } from './lib/serve.mjs';
+import { discover, report as discoverReport } from './lib/discover.mjs';
 
 const USAGE = `usage: skillset <command> [--project <dir>] [--json]
   inventory                       everything installed for this profile and project
@@ -19,6 +20,7 @@ const USAGE = `usage: skillset <command> [--project <dir>] [--json]
   check [--cached]                which plugins and skills have updates upstream (--cached: the last result, no network)
   skip <id> [--reason text]       stop proposing the pending update of <id> until a newer one appears
   scan <path> [--no-external]     facts about a plugin or skill folder before installing it
+  discover <words>                candidates for a job from your marketplaces, SkillsMP, GitHub and skillsllm.com; installs nothing
   serve                           the status page on 127.0.0.1; prints its link, then the queue for Claude on exit
   dismiss                         stop offering configuration in this project`;
 
@@ -125,18 +127,19 @@ switch (cmd) {
     if (!flags.cached) {
       writeState(p, { ...readState(p), checkStartedAt: new Date().toISOString() });
       await check(p);
+      if (!flags.quiet) stampPass(p); // --quiet is the hook's background run, which is no update pass
     }
     const st = readState(p);
     const list = pending(st);
     if (flags.quiet) break;
     const when = (iso) => new Date(iso).toLocaleString();
     const out = [`Profile ${p.configDir.replace(/\\/g, '/')}.`, st.checkedAt ? `Last check ${when(st.checkedAt)}: ${list.length} update(s) pending.` : 'No update check has run yet. Run `check` without --cached.'];
-    if (st.checkStartedAt) out.push(`The next background check starts with the first session after ${when(Date.parse(st.checkStartedAt) + 7 * 24 * 3600 * 1000)}.`);
+    out.push(st.passAt ? `Last update pass ${when(st.passAt)}${passDue(st) ? ', so a new one is due' : ''}.` : 'No update pass yet.');
     for (const u of list) out.push(`- ${u.id}: ${u.installed} → ${u.latest}  (${u.how})`);
     const skipped = Object.entries(st.skipped || {});
     if (skipped.length) out.push(`Skipped: ${skipped.map(([id, s]) => `${id} ${s.latest}${s.reason ? ` (${s.reason})` : ''}`).join(', ')}`);
     if (st.checkErrors?.length) out.push(`Not checked: ${st.checkErrors.join('; ')}`);
-    print({ checkedAt: st.checkedAt || null, updates: list, skipped: st.skipped || {}, errors: st.checkErrors || [] }, out.join('\n'));
+    print({ checkedAt: st.checkedAt || null, passAt: st.passAt || null, passDue: passDue(st), updates: list, skipped: st.skipped || {}, errors: st.checkErrors || [] }, out.join('\n'));
     break;
   }
   case 'skip': {
@@ -150,6 +153,12 @@ switch (cmd) {
     let r;
     try { r = scan(rest[0], { things: inventory({ projectDir }).things, external: !flags['no-external'] }); } catch (err) { fail(err.message); }
     print(r, report(r));
+    break;
+  }
+  case 'discover': {
+    let r;
+    try { r = await discover(rest.join(' '), { things: inventory({ projectDir }).things }); } catch (err) { fail(err.message); }
+    print(r, discoverReport(r));
     break;
   }
   case 'serve': {

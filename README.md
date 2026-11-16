@@ -22,15 +22,17 @@ Needs Node 18 or newer on the PATH. Works wherever Claude Code runs plugins and 
 ## Use
 
 - `/skillset-configure` asks what the project is for, shows what is installed against a proposed tiering, writes `SKILLSET.md`, applies it and adds a pointer to `CLAUDE.md`. In a project without a `SKILLSET.md`, Claude offers this once; decline and it stays quiet.
-- `/skillset-update` shows the status, moves things between tiers, installs through a compliance check, uninstalls, reconciles drift and reviews pending updates. Claude also uses it when you ask it to install or remove something.
-- `/skillset-status` opens the status page (below).
+- `/skillset-update` shows the status, finds new skills and plugins for a job, moves things between tiers, installs through a compliance check, uninstalls, reconciles drift and reviews pending updates. Claude also uses it when you ask it to find, install or remove something.
+- `/skillset-status` opens the status page, the main control panel (below). The **Skill set** button above the prompt opens it too.
 - Re-tier by moving a line to another section of `SKILLSET.md`. The next session applies it.
 
-Discovery of new skills is next.
+### The band above the prompt
+
+One row sits above the prompt in every session: the count of pending updates, **update pass due** once a week has passed since the last one, and a **Skill set** button that opens the status page. The button turns into the primary action while the pass is due. The row reads its state on every redraw, so it shows mid-session; no new session is needed. In a project with no `SKILLSET.md` it offers **Set up tiers** instead, and it disappears in a project where you declined. It reads two files and runs the plugin's own commands as if typed, queued until Claude is idle; it changes nothing. Other plugins keep their own rows.
 
 ### Status page
 
-`/skillset-status` starts a small local server and opens the page in the session's browser panel (in CCWrapper) or gives you the link. It shows the three tiers, anything not tiered yet and the pending updates. Moving something between tiers, checking for updates and skipping one apply at once, with no model and no tokens. Reviewing an update, uninstalling, finding alternatives and free-text research questions go to a queue; **Send to Claude** stops the page and hands the queue to the session, which handles it with `/skillset-update`. The server listens on 127.0.0.1 only, needs the per-launch token in its link, refuses other hosts and origins, loads nothing from the network, and stops after 30 minutes without use.
+`/skillset-status` starts a small local server and opens the page in the session's browser panel (in CCWrapper) or gives you the link. It shows the three tiers, anything not tiered yet and the pending updates. When the weekly update pass is due, a banner with a glowing **Run update pass** button leads the page: it checks every plugin and skill upstream and, if anything changed, hands the review to Claude at once. Moving something between tiers and skipping an update apply at once, with no model and no tokens. Reviewing an update, uninstalling, finding alternatives and free-text research questions go to a queue; **Send to Claude** stops the page and hands the queue to the session, which handles it with `/skillset-update`. The server listens on 127.0.0.1 only, needs the per-launch token in its link, refuses other hosts and origins, loads nothing from the network, and stops after 30 minutes without use.
 
 ### Compliance check
 
@@ -38,7 +40,14 @@ Before anything is installed, `scan` reads it (never runs it) and reports what i
 
 ### Updates
 
-Once a week, the first session start launches a background check and returns at once. It compares each plugin's installed version with its marketplace, each `npx skills` install with its GitHub folder, and each skill kept in a git clone with its remote. Nothing is changed: the next digest lists what is pending, and `/skillset-update` reviews each update against the project and applies or skips it. A skipped version is not proposed again.
+An update check compares each plugin's installed version with its marketplace, each `npx skills` install with its GitHub folder, and each skill kept in a git clone with its remote. It changes nothing. Two things run it:
+
+- **The update pass, once a week, from you.** The band marks it due seven days after the last one, in whatever session you are in. **Run update pass** on the status page (or asking `/skillset-update` for updates) runs the check, and Claude reviews each update against the project and applies or skips it. A skipped version is not proposed again.
+- **A silent background check at session start.** The SessionStart hook (a new session, `/resume`, `/clear` or a compaction; never a prompt) starts it once a week when it is due and returns at once, so the band's update count stays fresh. It is not a pass and asks nothing of you.
+
+### Discovery
+
+Ask Claude to find a skill or plugin for a job, or say yes to the once-a-week offer. `discover <words>` searches four sources and installs nothing: the plugins your own marketplaces offer (with install counts), [SkillsMP](https://skillsmp.com), GitHub repositories tagged `claude-skills`, and [skillsllm.com](https://skillsllm.com). Claude shortlists at most three that fit the project's scope, reads each one's README or SKILL.md, says how each compares with what you have, and installs your pick only through the compliance check.
 
 ## How it works
 
@@ -69,7 +78,7 @@ The hook reads files only and never spawns `claude`; once a week it starts the u
 - **Recorded, not enforced:** agents, user-scope MCP servers and claude.ai connectors. Claude Code documents no per-project switch for them, so an informative tier there is a note for the agent.
 - **Synced and built-in items obey the switches** (checked in the CLI, Claude Code 2.1.325): `skillOverrides` hides skills synced from a claude.ai account and built-in skills, and `enabledPlugins` switches off plugins synced from it. Not yet checked in the Desktop Code tab or in wrappers.
 - `.claude/settings.local.json` is personal. The informative section of `SKILLSET.md` is generated per machine, so it changes between machines if you commit the file.
-- **Network.** The weekly check reads public files from `raw.githubusercontent.com` and the GitHub API (60 unauthenticated requests an hour, one per skill repo) and runs `git ls-remote` on skill clones. SkillSpector's scan sends the target's dependency names to OSV.dev. Nothing else leaves the machine.
+- **Network.** The weekly check reads public files from `raw.githubusercontent.com` and the GitHub API (60 unauthenticated requests an hour, one per skill repo) and runs `git ls-remote` on skill clones. Discovery sends its search words to SkillsMP (50 anonymous searches a day) and the GitHub search API, and downloads skillsllm.com's public sitemap; Claude keeps project details out of those words. SkillSpector's scan sends the target's dependency names to OSV.dev. Nothing else leaves the machine.
 - **Update check coverage:** plugins from GitHub or local-folder marketplaces with a version number, `npx skills` installs from GitHub, and git clones. Plugins versioned by commit hash, other plugin sources and skills synced from claude.ai are not checked.
 
 ## Development
@@ -77,7 +86,8 @@ The hook reads files only and never spawns `claude`; once a week it starts the u
 No build step and no dependencies: Node built-ins only.
 
 ```bash
-node tests/core.test.mjs                 # inventory, tiers, settings, digest, hook, update check, scan, page server, CLI
+node tests/core.test.mjs                 # inventory, tiers, settings, digest, hook, update check, scan, page server, discovery, CLI
+claude plugin test .                     # the band above the prompt, on the terminal and desktop surfaces
 node scripts/skillset.mjs inventory      # what the tool sees on this machine
 claude plugin validate .
 ```

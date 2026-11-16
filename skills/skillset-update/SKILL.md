@@ -1,7 +1,7 @@
 ---
 name: skillset-update
-description: Change this project's skill set and keep installs current. Use when the user asks what is installed, wants to install, add, remove, uninstall or update a skill, plugin or MCP server, or move one between tiers, or when the session digest reports drift or pending updates.
-argument-hint: "[status | install <source> | uninstall <id> | move <tier> <id> | updates]"
+description: Change this project's skill set and keep installs current. Use when the user asks what is installed, wants to find, install, add, remove, uninstall or update a skill, plugin or MCP server, or move one between tiers, or when the session digest reports drift, pending updates or the weekly discovery offer.
+argument-hint: "[status | discover <job> | install <source> | uninstall <id> | move <tier> <id> | updates]"
 allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/skillset.mjs" *)
 ---
 
@@ -47,9 +47,15 @@ The digest or `status` reports it:
 
 ## Updates
 
-1. `check --cached` lists what the last check found. Run `check` (network, about ten seconds) when there is no result or the user wants a fresh one.
+1. `check --cached` lists what the last check found. Run `check` (network, about ten seconds) when there is no result or the user wants a fresh one. A `check` you run counts as the weekly update pass; the band above the prompt marks the pass due again after seven days.
 2. For each update the user wants reviewed, read what changed upstream: the release notes or CHANGELOG, or `https://github.com/<owner>/<repo>/compare/<installed>...<latest>` for commit-pinned skills. Review several skills from the same repo together. If the change adds hooks, MCP servers, scripts or permissions, clone the new version and scan it as in Install.
 3. Apply the update when it fits the project's scope and is safe. Otherwise run `skip <id> --reason "<why>"` so it is not proposed again until a newer version appears.
 4. Apply with the update's `how` command once the user agrees. Updates are per account, not per project, so say so. Plugin updates need a restart.
 
+## Discover
+
+1. **Name the job in two to five plain words** ("database migrations", "pdf forms"), taken from the request or from the project's `Scope:` line. The words go to SkillsMP and GitHub, so never put private project details, names or paths in them.
+2. **Search:** `discover <words> --json`. It returns candidates from the user's own marketplaces (with install counts), SkillsMP, GitHub repos tagged `claude-skills`, and skillsllm.com, marking what this profile already has. `npx skills find <words>` is one more source when the user wants it.
+3. **Shortlist three at most** that fit the scope and the stack. Prefer a plugin from the user's marketplaces with many installs, then a maintained repo (recent pushes, real stars). Read each one's README or SKILL.md before proposing it. Skip anything that only duplicates an installed thing, unless it is clearly better and you can say why.
+4. **Propose** each with what it would do in this project, its source and how it compares with what is installed. On the user's pick, continue with Install, which scans it first. Nothing is installed from a search result directly.
 The review rules in Install are adapted from the `skill-inspector` skill of [NVIDIA SkillSpector](https://github.com/NVIDIA/skillspector) (Apache-2.0).

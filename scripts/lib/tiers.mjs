@@ -211,7 +211,7 @@ function usefulLine(item, t) {
 }
 
 // What the SessionStart hook tells the model. Claude Code caps hook output at 10,000 characters.
-export function digest({ items, things, applied = { changes: [] }, updates = [], cap = 4000 }) {
+export function digest({ items, things, applied = { changes: [] }, updates = [], discover = false, cap = 4000 }) {
   const byId = new Map(things.map((t) => [t.id, t]));
   const useful = items.filter((i) => i.tier === 'useful');
   const off = items.filter((i) => i.tier === 'informative').length;
@@ -228,6 +228,7 @@ export function digest({ items, things, applied = { changes: [] }, updates = [],
     if (drift.untiered.length) out.push(`Installed but not in SKILLSET.md yet: ${names(drift.untiered)}. Offer /skillset-update to tier them.`);
     if (drift.missing.length) out.push(`Listed in SKILLSET.md but not installed in this profile: ${names(drift.missing)}. Offer /skillset-update to reinstall or drop them.`);
     if (updates.length) out.push(`Updates available upstream: ${names(updates.map((u) => `${u.id} ${u.installed} → ${u.latest}`), 5)}. Offer /skillset-update to review them.`);
+    if (discover) out.push('Weekly: once, when it does not interrupt the user, offer to look for new skills and plugins that fit this project (the Discover job of /skillset-update).');
     if (applied.error) out.push(`skillset could not apply the tiers: ${applied.error}.`);
     else if (applied.changes?.length) out.push(`Re-applied ${applied.changes.length} tier setting(s) from SKILLSET.md.${applied.reload ? ' Plugin changes take effect after /reload-plugins or in a new session.' : ''}`);
     return out.join('\n') + '\n';

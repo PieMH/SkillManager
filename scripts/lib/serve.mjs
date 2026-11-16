@@ -9,10 +9,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inventory, oneLine, paths } from './inventory.mjs';
 import { FILE, TIERABLE, TIERS, lead, moveItems, parse, reconcile, split, summarize } from './tiers.mjs';
-import { check, pending, readState, skip } from './updates.mjs';
+import { check, passDue, pending, readState, skip, stampPass } from './updates.mjs';
 
 const PAGE = fileURLToPath(new URL('./page.html', import.meta.url));
-const KINDS = new Set(['update', 'uninstall', 'similar', 'research']);
+const KINDS = new Set(['update', 'updates', 'uninstall', 'similar', 'research']);
 const fwd = (p) => String(p).replace(/\\/g, '/');
 
 function readBody(req, max = 64 * 1024) {
@@ -52,6 +52,8 @@ export function startServer({ projectDir, env = process.env, home, idleMs = 30 *
       untiered: reconcile(items, all).untiered.map((id) => view(id, { text: oneLine(byId.get(id)?.description, 120) })),
       updates: pending(st),
       checkedAt: st.checkedAt || null,
+      passAt: st.passAt || null,
+      passDue: passDue(st),
       queue,
     };
   }
@@ -103,15 +105,25 @@ export function startServer({ projectDir, env = process.env, home, idleMs = 30 *
           const r = moveItems(projectDir, body.tier, [].concat(body.ids || []).map(String), things());
           return json(res, 200, { changes: summarize(r.changes), reload: Boolean(r.reload), unenforced: r.unenforced, error: r.error || null, state: snapshot() });
         }
-        case '/api/check':
+        // The update pass: a fresh check, stamped; anything pending goes to Claude at once as one review,
+        // with whatever else is queued. With nothing pending the pass is done and the page stays.
+        case '/api/pass': {
           await check(p, io);
-          return json(res, 200, { state: snapshot() });
+          stampPass(p);
+          const count = pending(readState(p)).length;
+          if (!count) return json(res, 200, { sent: false, state: snapshot() });
+          if (!queue.some((q) => q.kind === 'updates')) queue.push({ kind: 'updates', id: null, text: null });
+          res.on('finish', () => finish('sent'));
+          return json(res, 200, { sent: true, count: queue.length, updates: count });
+        }
         case '/api/skip':
           skip(p, String(body.id || ''), String(body.reason || '').slice(0, 300));
           return json(res, 200, { state: snapshot() });
         case '/api/queue': {
           const item = { kind: String(body.kind || ''), id: body.id ? String(body.id).slice(0, 200) : null, text: body.text ? String(body.text).trim().slice(0, 1000) : null };
-          if (!KINDS.has(item.kind) || (item.kind === 'research' ? !item.text : !item.id)) return json(res, 400, { error: 'unknown request' });
+          const needs = { research: 'text', updates: false }[item.kind] ?? 'id'; // false: "review every update" needs neither
+          if (!KINDS.has(item.kind) || (needs && !item[needs])) return json(res, 400, { error: 'unknown request' });
+          if (item.kind === 'updates' && queue.some((q) => q.kind === 'updates')) return json(res, 200, { queue });
           if (queue.length >= 50) return json(res, 400, { error: 'the queue is full; send it first' });
           queue.push(item);
           return json(res, 200, { queue });

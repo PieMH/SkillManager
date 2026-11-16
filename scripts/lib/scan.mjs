@@ -76,7 +76,7 @@ function mcpOf(manifest, root) {
   });
 }
 
-function which(exe, env = process.env) {
+export function which(exe, env = process.env) {
   if (!exe) return null;
   const exts = process.platform === 'win32' ? ['', ...(env.PATHEXT || '.EXE;.CMD;.BAT').split(';').map((e) => e.toLowerCase())] : [''];
   for (const dir of (env.PATH || env.Path || '').split(path.delimiter).filter(Boolean)) {

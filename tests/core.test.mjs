@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { frontmatter, inventory, oneLine } from '../scripts/lib/inventory.mjs';
 import { apply, digest, parse, reconcile, render, setTier, summarize } from '../scripts/lib/tiers.mjs';
 import { dismiss, sessionStart } from '../scripts/lib/session.mjs';
-import { check, due, newer, pending, readState, writeState } from '../scripts/lib/updates.mjs';
+import { check, due, newer, passDue, pending, readState, skip, writeState } from '../scripts/lib/updates.mjs';
 import { report, scan } from '../scripts/lib/scan.mjs';
 import { paths } from '../scripts/lib/inventory.mjs';
 
@@ -168,8 +168,10 @@ assert.equal(sessionStart({ projectDir: project, env, home, ...quiet }), '', 'a 
 write(path.join(project, 'SKILLSET.md'), text);
 const started = sessionStart({ projectDir: project, env, home, ...quiet });
 assert.match(started, /Re-applied 4 tier setting\(s\).*\/reload-plugins/);
+assert.match(started, /Weekly: once, .*look for new skills/, 'the session that starts the weekly check offers discovery');
 assert.equal(JSON.parse(fs.readFileSync(local, 'utf8')).skillOverrides.humanizer, 'name-only');
-assert.ok(!sessionStart({ projectDir: project, env, home, ...quiet }).includes('Re-applied'), 'a second start has nothing to re-apply');
+const again = sessionStart({ projectDir: project, env, home, ...quiet });
+assert.ok(!again.includes('Re-applied') && !again.includes('Weekly:'), 'a second start re-applies nothing and offers nothing');
 write(path.join(project, 'SKILLSET.md'), '# Skills\n\nSomething else entirely.\n');
 assert.equal(sessionStart({ projectDir: project, env, home, ...quiet }), '', 'a SKILLSET.md without tier items is left alone');
 assert.equal(spawned.length, 1, 'the weekly check starts once, then waits a week');
@@ -215,6 +217,7 @@ const DAY = 24 * 3600 * 1000;
 assert.equal(due({}), true);
 assert.equal(due({ checkStartedAt: new Date(Date.now() - DAY).toISOString() }), false);
 assert.equal(due({ checkStartedAt: new Date(Date.now() - 8 * DAY).toISOString() }), true);
+assert.deepEqual([passDue({}), passDue({ passAt: new Date(Date.now() - 6 * DAY).toISOString() }), passDue({ passAt: new Date(Date.now() - 8 * DAY).toISOString() })], [true, false, true]);
 
 const dirMkt = path.join(root, 'dir-mkt');
 write(path.join(dirMkt, '.claude-plugin', 'marketplace.json'), { name: 'dirmkt', plugins: [{ name: 'local', source: './' }] });
@@ -342,18 +345,76 @@ await post('/api/queue', { kind: 'update', id: 'plugin:tool@mkt' });
 await post('/api/queue', { kind: 'research', text: 'a skill for SQL migrations' });
 got = await post('/api/unqueue', { index: 0 });
 assert.deepEqual(got.json.queue, [{ kind: 'research', id: null, text: 'a skill for SQL migrations' }]);
-got = await post('/api/check', {});
-assert.deepEqual(got.json.state.updates.map((u) => u.id).sort(), ['plugin:local@dirmkt', 'skill:humanizer']);
+await post('/api/queue', { kind: 'updates' });
+got = await post('/api/queue', { kind: 'updates' });
+assert.deepEqual(got.json.queue.map((x) => x.kind), ['research', 'updates'], '"review every update" is queued once');
+await post('/api/unqueue', { index: 1 });
+got = await call('GET', '/api/state', { headers: auth });
+assert.deepEqual(got.json.updates.map((u) => u.id).sort(), ['plugin:local@dirmkt', 'skill:humanizer']);
+assert.deepEqual([got.json.passAt, got.json.passDue], [null, true], 'no update pass yet, so one is due');
 got = await post('/api/skip', { id: 'plugin:local@dirmkt', reason: 'later' });
 assert.deepEqual(got.json.state.updates.map((u) => u.id), ['skill:humanizer']);
 assert.equal(readState(p).skipped['plugin:local@dirmkt'].reason, 'later');
-got = await post('/api/send', {});
-assert.deepEqual(got.json, { ok: true, count: 1 });
+got = await post('/api/pass', {});
+assert.deepEqual(got.json, { sent: true, count: 2, updates: 1 }, 'a pass with something pending goes to Claude with the queue');
 await new Promise((r) => setTimeout(r, 50));
-assert.deepEqual(exited, { reason: 'sent', queue: [{ kind: 'research', id: null, text: 'a skill for SQL migrations' }] });
+assert.deepEqual(exited, { reason: 'sent', queue: [{ kind: 'research', id: null, text: 'a skill for SQL migrations' }, { kind: 'updates', id: null, text: null }] });
+assert.ok(Date.now() - Date.parse(readState(p).passAt) < 60000, 'the pass is stamped');
 await assert.rejects(call('GET', '/api/state', { headers: auth }), 'the server stops after sending');
+
+skip(p, 'skill:humanizer', 'not now');
+const quietPage = await startServer({ projectDir: project, env, home, io, onExit: () => {} });
+got = await new Promise((resolve, reject) => {
+  const data = '{}';
+  const rq = http.request({ host: '127.0.0.1', port: quietPage.port, method: 'POST', path: '/api/pass', headers: { host: `127.0.0.1:${quietPage.port}`, 'x-skillset-token': quietPage.token, 'content-type': 'application/json', 'content-length': 2 } }, (rs) => {
+    let s = '';
+    rs.on('data', (c) => { s += c; });
+    rs.on('end', () => resolve(JSON.parse(s)));
+  });
+  rq.on('error', reject);
+  rq.end(data);
+});
+assert.deepEqual([got.sent, got.state.updates, got.state.passDue], [false, [], false], 'with nothing pending the pass is done and the page stays');
+quietPage.close();
+
 const idle = await new Promise((resolve) => { startServer({ projectDir: project, env, home, idleMs: 40, onExit: resolve }); });
 assert.deepEqual(idle, { reason: 'idle', queue: [] }, 'an unused page stops by itself');
+
+// --- discover ------------------------------------------------------------------------------------
+const { discover, terms, report: discoverReport } = await import('../scripts/lib/discover.mjs');
+assert.deepEqual(terms('The database migrations skill'), ['database', 'migrations']);
+const dio = {
+  plugins: () => [
+    { pluginId: 'pg-tools@mkt', name: 'pg-tools', description: 'Database migrations for Postgres.', installCount: 1200 },
+    { pluginId: 'db@mkt', name: 'db', description: 'A database browser.', installCount: 9000 },
+    { pluginId: 'humanizer@other', name: 'humanizer', description: 'Writes database migrations notes.', installCount: 3 },
+    { pluginId: 'pg-tools@directory', name: 'pg-tools', description: 'Database migrations for Postgres.' },
+  ],
+  getJson: async (url) => {
+    if (url.includes('skillsmp.com')) return { data: { skills: [
+      { name: 'database-migrations', author: 'ann', description: 'Safe migrations.', contentLanguage: 'en', githubUrl: 'https://github.com/ann/s/tree/main/database-migrations', stars: 52 },
+      { name: 'database-migrations', author: 'ann', description: 'Migraciones.', contentLanguage: 'es', githubUrl: 'https://github.com/ann/s/tree/main/es' },
+      { name: 'database-migrations', author: 'ann', description: 'The same skill at another path.', contentLanguage: 'en', githubUrl: 'https://github.com/ann/s/tree/main/copy' },
+      { name: 'notion-sync', author: 'cy', description: 'Notion databases and pages.', contentLanguage: 'en' },
+    ] } };
+    if (url.includes('api.github.com')) { assert.match(decodeURIComponent(url), /database migrations topic:claude-skills/); return { items: [{ full_name: 'bo/migrate-skill', description: 'A migrations skill.', stargazers_count: 31, pushed_at: '2026-10-01T00:00:00Z', html_url: 'https://github.com/bo/migrate-skill' }] }; }
+    throw new Error('unexpected url');
+  },
+  getText: async () => '<urlset><url><loc>https://skillsllm.com/skill/database-migrations-pro</loc></url><url><loc>https://skillsllm.com/skill/database-viewer</loc></url><url><loc>https://skillsllm.com/blog/database-migrations</loc></url></urlset>',
+};
+let dr = await discover('database migrations', { things: inv.things, io: dio });
+assert.deepEqual(dr.errors, []);
+assert.deepEqual(dr.candidates.map((c) => `${c.source}:${c.name}${c.installed ? '*' : ''}`), [
+  'marketplace:pg-tools@mkt', 'marketplace:humanizer@other*',
+  'skillsmp:database-migrations',
+  'github:bo/migrate-skill',
+  'skillsllm:database-migrations-pro',
+], 'two words must match; each plugin and skill once; one language; installed things are marked');
+assert.equal(dr.candidates[0].install, 'claude plugin install pg-tools@mkt');
+assert.match(discoverReport(dr), /Your marketplaces:\n- pg-tools@mkt — Database migrations for Postgres\. · 1,200 installs · claude plugin install pg-tools@mkt/);
+dr = await discover('database migrations', { things: inv.things, io: { ...dio, getText: async () => { throw new Error('HTTP 503'); } } });
+assert.deepEqual([dr.errors, dr.candidates.some((c) => c.source === 'github')], [['skillsllm: HTTP 503'], true], 'one source failing leaves the others');
+await assert.rejects(discover('a an', { io: dio }), /describe the job/);
 
 fs.rmSync(root, { recursive: true, force: true });
 console.log('core.test.mjs: all checks passed');

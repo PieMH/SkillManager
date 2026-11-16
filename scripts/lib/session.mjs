@@ -17,12 +17,14 @@ export function dismiss(projectDir, env = process.env, home) {
 }
 
 // The weekly update check runs detached: the hook stamps the start, launches it and returns at once.
+// Returns true in the session that starts it, which is also the one that offers discovery that week.
 function startCheck(p, state, now, env, spawn) {
-  if (!due(state, now)) return;
+  if (!due(state, now)) return false;
   try {
     writeState(p, { ...state, checkStartedAt: new Date(now).toISOString() });
     spawn(process.execPath, [CLI, 'check', '--quiet'], { detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, ...env } }).unref();
-  } catch { /* a check that cannot start is skipped until next week */ }
+    return true;
+  } catch { return false; } // a check that cannot start is skipped until next week
 }
 
 export function sessionStart({ projectDir, env = process.env, home, now = Date.now(), spawn = spawnProcess } = {}) {
@@ -38,7 +40,7 @@ export function sessionStart({ projectDir, env = process.env, home, now = Date.n
   const { items } = parse(text);
   if (!items.length) return ''; // a SKILLSET.md with no tier items is not ours to act on
   const state = readState(p);
-  startCheck(p, state, now, env, spawn);
+  const weekly = startCheck(p, state, now, env, spawn);
   const { things } = inventory({ projectDir, env, home: p.home });
-  return digest({ items, things, applied: apply(projectDir, items), updates: pending(state) });
+  return digest({ items, things, applied: apply(projectDir, items), updates: pending(state), discover: weekly });
 }

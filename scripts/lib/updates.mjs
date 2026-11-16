@@ -21,6 +21,11 @@ export function writeState(p, state) {
 // so sessions that open together start one check, not several.
 export const due = (state, now = Date.now()) => !(now - (Date.parse(state.checkStartedAt) || 0) < WEEK);
 
+// The update pass is the person's weekly review: a check they asked for, and the review of what it found.
+// The background check refreshes the list but is no pass. The band and the board both read this.
+export const passDue = (state, now = Date.now()) => !(now - (Date.parse(state.passAt) || 0) <= WEEK);
+export const stampPass = (p, now = Date.now()) => writeState(p, { ...readState(p), passAt: new Date(now).toISOString() });
+
 // Pending: found by the last check and not skipped at that same version.
 export const pending = (state) => (state.updates || []).filter((u) => state.skipped?.[u.id]?.latest !== u.latest);
 

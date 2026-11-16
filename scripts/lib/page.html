@@ -86,6 +86,19 @@ ul.rows { list-style: none; margin: 0; padding: 0; }
 .empty { margin: 0; padding: 14px 16px; border-radius: var(--radius-inner); background: var(--surface); color: var(--muted); }
 .more-rows { padding: 14px 0 0; }
 
+/* The weekly update pass, once it is due: the one control on the page that asks to be pressed. */
+.pass { display: flex; align-items: center; gap: 16px; margin: 20px 0 0; padding: 14px 14px 14px 20px; border-radius: var(--radius-card); background: var(--surface); }
+.pass p { margin: 0; flex: 1; min-width: 0; color: var(--muted); text-wrap: pretty; }
+.pass p b { color: var(--text); font-weight: 600; }
+.glow { animation: glow 2.4s ease-in-out infinite; }
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 125, 77, 0), 0 0 14px 2px rgba(255, 125, 77, .35); }
+  50% { box-shadow: 0 0 0 3px rgba(255, 125, 77, .28), 0 0 30px 8px rgba(255, 125, 77, .55); }
+}
+.glow:disabled { animation: none; box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .glow { animation: none; box-shadow: 0 0 0 3px rgba(255, 125, 77, .3), 0 0 22px 4px rgba(255, 125, 77, .45); } }
+@media (max-width: 640px) { .pass { flex-direction: column; align-items: stretch; padding: 16px; } }
+
 /* Controls: pills. The primary is inverted (white, black label); the rest are outlined. */
 select, button, textarea, input { font: inherit; font-size: 13px; color: var(--text); }
 select { width: 128px; height: var(--control-height); padding: 0 10px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--ground); cursor: pointer; }
@@ -162,6 +175,10 @@ textarea:hover { border-color: var(--control-hover); }
 <div class="page">
   <h1>Skill set</h1>
   <p id="finding">Loading…</p>
+  <div class="pass" id="pass" hidden>
+    <p id="pass-text"></p>
+    <button class="btn primary glow" id="pass-run">Run update pass</button>
+  </div>
   <div class="layout">
     <main>
       <div class="loadout" id="loadout" aria-hidden="true"></div>
@@ -196,7 +213,7 @@ const ABOUT = {
   informative: ['Installed on this machine, switched off in this project.', 'Nothing is switched off here.'],
   updates: ['Newer upstream than what is installed. An update applies to every project on this account.', 'Everything is up to date.'],
 };
-const ASK = { update: 'Review the update of', uninstall: 'Uninstall', similar: 'Find alternatives to', research: 'Research:' };
+const ASK = { update: 'Review the update of', updates: 'Review every pending update', uninstall: 'Uninstall', similar: 'Find alternatives to', research: 'Research:' };
 const $ = (id) => document.getElementById(id);
 let state = null;
 let tab = 'essential';
@@ -349,7 +366,7 @@ function render() {
 
   const items = L[tab];
   const stamp = tab === 'updates' && state.checkedAt ? el('span', { class: 'stamp num' }, `Checked ${new Date(state.checkedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`) : null;
-  const check = tab === 'updates' ? el('button', { class: 'btn', disabled: checking || stopped, onclick: checkNow }, checking ? 'Checking…' : 'Check now') : null;
+  const check = tab === 'updates' ? el('button', { class: 'btn', disabled: checking || stopped, onclick: runPass }, checking ? 'Checking…' : 'Run update pass') : null;
   $('toolbar').replaceChildren(...[el('p', {}, q ? `${plural(items.length, 'match', 'matches')} for “${$('filter').value.trim()}”.` : ABOUT[tab][0]), stamp, check].filter(Boolean));
 
   let rows;
@@ -360,6 +377,15 @@ function render() {
     if (shown.length < items.length) rows.push(el('li', { class: 'more-rows' }, el('button', { class: 'btn', onclick: () => { allUpdates = true; render(); } }, `Show ${items.length - shown.length} more`)));
   } else rows = items.map((x) => row(x, tab === 'untiered' ? null : tab));
   $('list').replaceChildren(...rows);
+
+  // The pass banner: shown on every tab once a week has gone by since the last update pass.
+  const days = state.passAt ? Math.floor((Date.now() - Date.parse(state.passAt)) / 86400000) : null;
+  $('pass').hidden = !state.passDue || stopped;
+  $('pass-text').replaceChildren(el('b', {}, 'Update pass due. '), days === null
+    ? 'None has run yet. It checks every plugin and skill upstream, then Claude reviews what changed.'
+    : `The last one was ${plural(days, 'day')} ago${all.updates.length ? `, and ${plural(all.updates.length, 'update is', 'updates are')} waiting` : ''}.`);
+  $('pass-run').disabled = checking || stopped;
+  $('pass-run').textContent = checking ? 'Checking…' : 'Run update pass';
 
   const queue = state.queue || [];
   $('queue-n').textContent = queue.length ? String(queue.length) : '';
@@ -388,16 +414,21 @@ const enqueue = run(async (item) => {
 });
 const unqueue = run(async (index) => { const r = await api('/api/unqueue', { index }); state.queue = r.queue; render(); });
 const skipIt = run(async (id, reason) => { const r = await api('/api/skip', { id, reason }); state = r.state; render(); say(`Skipped this version of ${id}. A newer one will be proposed again.`); });
-const checkNow = run(async () => {
+// The update pass: a fresh check; what it finds goes to Claude at once for review, and this page closes.
+const runPass = run(async () => {
   checking = true; render(); say('Checking upstream. This takes about ten seconds.');
-  try { const r = await api('/api/check', {}); state = r.state; } finally { checking = false; }
+  let r;
+  try { r = await api('/api/pass', {}); } finally { checking = false; }
+  if (r.sent) return stop(`Update pass sent: Claude is reviewing ${plural(r.updates, 'update')}${r.count > 1 ? ` and ${plural(r.count - 1, 'other request')}` : ''}. You can close this tab.`, false);
+  state = r.state;
   render();
-  say(state.updates.length ? `${plural(state.updates.length, 'update')} pending.` : 'Everything is up to date.');
+  say('Update pass done: everything is up to date.');
 });
 const send = run(async () => { const r = await api('/api/send', {}); stop(`Sent ${plural(r.count, 'request')} to Claude. You can close this tab.`, false); });
 const addAsk = () => { const text = $('ask').value.trim(); if (!text) return; enqueue({ kind: 'research', text }); $('ask').value = ''; };
 
 $('ask-add').addEventListener('click', addAsk);
+$('pass-run').addEventListener('click', runPass);
 $('ask').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addAsk(); });
 $('dock-send').addEventListener('click', send);
 $('rail-send').addEventListener('click', send);
