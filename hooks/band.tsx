@@ -1,4 +1,4 @@
-// The skillset band: one row above the prompt with the board one click away, and a mark once the weekly
+// The SkillManager band: one row above the prompt with the board one click away, and a mark once the weekly
 // update pass is due, seen mid-session with no new session needed. It reads two files and runs the
 // plugin's own commands, as if typed; it writes nothing. Each plugin has its own row, so ponytail's stays.
 import type { EngineInterface, Register } from 'claude-code'
@@ -20,13 +20,13 @@ async function configDir($: EngineInterface): Promise<string> {
 
 const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
 
-// What the band shows, from the project's SKILLSET.md and the profile's state file. Missing files read as
+// What the band shows, from the project's SKILLMANAGER.md and the profile's state file. Missing files read as
 // "nothing yet": an untiered project, no update pass so far.
 export async function look($: EngineInterface): Promise<Seen> {
   const cwd = await $.session.cwd()
-  const tiered = await $.fs.exists(`${cwd}/SKILLSET.md`).catch(() => false)
+  const tiered = await $.fs.exists(`${cwd}/SKILLMANAGER.md`).catch(() => false)
   let state: State = {}
-  try { state = JSON.parse(await $.fs.read(`${await configDir($)}/skillset/state.json`)) as State } catch { /* none yet */ }
+  try { state = JSON.parse(await $.fs.read(`${await configDir($)}/skillmanager/state.json`)) as State } catch { /* none yet */ }
   const skipped = state.skipped ?? {}
   const pending = (state.updates ?? []).filter(u => skipped[u.id]?.latest !== u.latest).length
   const passAt = Date.parse(state.passAt ?? '')
@@ -49,16 +49,16 @@ export const register: Register = on => {
     const { Box, Text, Button } = $.ui.resolve(e)
     // Queued by the engine and run once the session is idle, so a click never cuts into a turn.
     const run = (command: string) => () => {
-      void $.command.run({ command }).catch(() => $.ui.toast(`skillset: could not run /${command}`))
+      void $.command.run({ command }).catch(() => $.ui.toast(`SkillManager: could not run /${command}`))
     }
 
     if (!s.tiered) {
       return (
         <Box flexDirection="row" alignItems="center" gap={2} width={e.props.bodyColumns}>
-          <Text dimColor>skillset</Text>
+          <Text dimColor>SkillManager</Text>
           <Text dimColor>every installed skill loads here</Text>
           <Box flexGrow={1} />
-          <Button key="configure" plain label="Set up tiers" onPress={run('skillset:skillset-configure')} />
+          <Button key="configure" plain label="Set up tiers" onPress={run('skillmanager:skillmanager-configure')} />
         </Box>
       )
     }
@@ -66,16 +66,15 @@ export const register: Register = on => {
     const last = s.days === null ? 'never run' : `last ${s.days} days ago`
     return (
       <Box flexDirection="row" alignItems="center" gap={2} width={e.props.bodyColumns}>
-        <Text dimColor>skillset</Text>
         {s.pending > 0 && <Text>{s.pending} {s.pending === 1 ? 'update' : 'updates'}</Text>}
         {s.due && <Text color="warning">update pass due</Text>}
         {s.due && <Text dimColor>{last}</Text>}
         <Box flexGrow={1} />
         <Button
           key="board"
-          label="Skill set"
+          label="SkillManager"
           {...(s.due ? { variant: 'primary' as const } : { plain: true as const })}
-          onPress={run('skillset:skillset-status')}
+          onPress={run('skillmanager:skillmanager-status')}
         />
       </Box>
     )

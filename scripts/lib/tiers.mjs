@@ -1,10 +1,10 @@
-// SKILLSET.md: three tier sections, one list item per thing. The scripts read only the backticked
+// SKILLMANAGER.md: three tier sections, one list item per thing. The scripts read only the backticked
 // id and the section it sits in; the rest of each line is for people and agents.
 import fs from 'node:fs';
 import path from 'node:path';
 import { oneLine, readJson } from './inventory.mjs';
 
-export const FILE = 'SKILLSET.md';
+export const FILE = 'SKILLMANAGER.md';
 export const TIERS = ['essential', 'useful', 'informative'];
 // Kinds a tier can be chosen for. Hooks are listed for information; connectors and built-in
 // skills are added by hand because nothing on disk describes them.
@@ -66,10 +66,10 @@ const NOTES = {
 export function render({ scope, tiers, things }) {
   const byId = new Map(things.map((t) => [t.id, t]));
   const out = [
-    '# Skill set', '',
+    '# SkillManager', '',
     `Scope: ${scope || '(what this project is for)'}`, '',
-    'The Claude Code skills, plugins, MCP servers and agents for this project, in three tiers. The skillset plugin',
-    'applies them at every session start. To re-tier something, move its line to another section or run `/skillset-update`.', '',
+    'The Claude Code skills, plugins, MCP servers and agents for this project, in three tiers. The SkillManager plugin',
+    'applies them at every session start. To re-tier something, move its line to another section or run `/skillmanager-update`.', '',
   ];
   for (const tier of TIERS) {
     out.push(`## ${title(tier)}`, '', NOTES[tier], '', ...(tiers[tier] || []).map((id) => itemLine(byId.get(id) || { id }, tier)), '');
@@ -121,7 +121,7 @@ export function desired(items, projectMcp = new Set()) {
   for (const it of items) {
     const [kind, name] = split(it.id);
     if (kind === 'skill' || kind === 'builtin') d.skillOverrides[name] = SKILL_STATE[it.tier];
-    else if (kind === 'plugin') { if (!name.startsWith('skillset@')) d.enabledPlugins[name] = it.tier === 'essential'; } // never switch ourselves off
+    else if (kind === 'plugin') { if (!name.startsWith('skillmanager@')) d.enabledPlugins[name] = it.tier === 'essential'; } // never switch ourselves off
     else if (kind === 'mcp' && projectMcp.has(name)) (it.tier === 'informative' ? d.mcpOff : d.mcpOn).push(name);
     else if (it.tier === 'informative' && kind !== 'hook') d.unenforced.push(it.id); // no documented per-project switch
   }
@@ -129,7 +129,7 @@ export function desired(items, projectMcp = new Set()) {
 }
 
 // Writes the tiers into the project's .claude/settings.local.json. Touches only the entries of
-// things listed in SKILLSET.md (plus `drop`, ids that were just removed from it); idempotent.
+// things listed in SKILLMANAGER.md (plus `drop`, ids that were just removed from it); idempotent.
 export function apply(projectDir, items, drop = []) {
   const file = path.join(projectDir, '.claude', 'settings.local.json');
   let cur = {};
@@ -189,7 +189,7 @@ export function reconcile(items, things) {
   const listed = new Set(items.map((i) => i.id));
   const installed = new Set(things.map((t) => t.id));
   return {
-    untiered: things.filter((t) => TIERABLE.has(t.kind) && !listed.has(t.id) && !t.id.startsWith('plugin:skillset@')).map((t) => t.id),
+    untiered: things.filter((t) => TIERABLE.has(t.kind) && !listed.has(t.id) && !t.id.startsWith('plugin:skillmanager@')).map((t) => t.id),
     missing: items.filter((i) => TIERABLE.has(split(i.id)[0]) && !installed.has(i.id)).map((i) => i.id),
   };
 }
@@ -217,20 +217,20 @@ export function digest({ items, things, applied = { changes: [] }, updates = [],
   const off = items.filter((i) => i.tier === 'informative').length;
   const drift = reconcile(items, things);
   const build = (brief) => {
-    const out = ['skillset: this project tiers its Claude Code stack in SKILLSET.md. Essential items are loaded.'];
+    const out = ['SkillManager: this project tiers its Claude Code stack in SKILLMANAGER.md. Essential items are loaded.'];
     if (useful.length) {
       out.push('Useful tier, not loaded up front. Pull one in when a task calls for it:');
-      if (brief) out.push(`${names(useful.map((u) => u.id), 60)}. Each has a one-line description in SKILLSET.md.`);
+      if (brief) out.push(`${names(useful.map((u) => u.id), 60)}. Each has a one-line description in SKILLMANAGER.md.`);
       else for (const u of useful) out.push(`- ${usefulLine(u, byId.get(u.id))}`);
       if (useful.some((u) => u.id.startsWith('plugin:'))) out.push('To load an off plugin: `claude plugin enable <id> --scope local`, then ask the user to run /reload-plugins.');
     }
-    if (off) out.push(`Informative tier: ${off} more installed things are kept out of this project. Check SKILLSET.md before telling the user a capability is missing.`);
-    if (drift.untiered.length) out.push(`Installed but not in SKILLSET.md yet: ${names(drift.untiered)}. Offer /skillset-update to tier them.`);
-    if (drift.missing.length) out.push(`Listed in SKILLSET.md but not installed in this profile: ${names(drift.missing)}. Offer /skillset-update to reinstall or drop them.`);
-    if (updates.length) out.push(`Updates available upstream: ${names(updates.map((u) => `${u.id} ${u.installed} → ${u.latest}`), 5)}. Offer /skillset-update to review them.`);
-    if (discover) out.push('Weekly: once, when it does not interrupt the user, offer to look for new skills and plugins that fit this project (the Discover job of /skillset-update).');
-    if (applied.error) out.push(`skillset could not apply the tiers: ${applied.error}.`);
-    else if (applied.changes?.length) out.push(`Re-applied ${applied.changes.length} tier setting(s) from SKILLSET.md.${applied.reload ? ' Plugin changes take effect after /reload-plugins or in a new session.' : ''}`);
+    if (off) out.push(`Informative tier: ${off} more installed things are kept out of this project. Check SKILLMANAGER.md before telling the user a capability is missing.`);
+    if (drift.untiered.length) out.push(`Installed but not in SKILLMANAGER.md yet: ${names(drift.untiered)}. Offer /skillmanager-update to tier them.`);
+    if (drift.missing.length) out.push(`Listed in SKILLMANAGER.md but not installed in this profile: ${names(drift.missing)}. Offer /skillmanager-update to reinstall or drop them.`);
+    if (updates.length) out.push(`Updates available upstream: ${names(updates.map((u) => `${u.id} ${u.installed} → ${u.latest}`), 5)}. Offer /skillmanager-update to review them.`);
+    if (discover) out.push('Weekly: once, when it does not interrupt the user, offer to look for new skills and plugins that fit this project (the Discover job of /skillmanager-update).');
+    if (applied.error) out.push(`SkillManager could not apply the tiers: ${applied.error}.`);
+    else if (applied.changes?.length) out.push(`Re-applied ${applied.changes.length} tier setting(s) from SKILLMANAGER.md.${applied.reload ? ' Plugin changes take effect after /reload-plugins or in a new session.' : ''}`);
     return out.join('\n') + '\n';
   };
   const full = build(false);

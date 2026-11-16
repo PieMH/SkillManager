@@ -25,7 +25,7 @@ export function paths(env = process.env, home = os.homedir()) {
     configDir,
     // Claude Code keeps .claude.json in the home dir unless CLAUDE_CONFIG_DIR moves it.
     globalJson: path.join(env.CLAUDE_CONFIG_DIR ? configDir : home, '.claude.json'),
-    stateFile: path.join(configDir, 'skillset', 'state.json'),
+    stateFile: path.join(configDir, 'skillmanager', 'state.json'),
   };
 }
 

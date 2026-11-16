@@ -1,11 +1,11 @@
 // Discovery: candidates for a job, from four public sources. It installs nothing and judges nothing:
-// /skillset-update filters the candidates by the project's scope and sends the promising ones through `scan`.
+// /skillmanager-update filters the candidates by the project's scope and sends the promising ones through `scan`.
 // The search words leave the machine (SkillsMP, GitHub); the marketplace list is read through the local CLI.
 import { spawnSync } from 'node:child_process';
 import { oneLine } from './inventory.mjs';
 import { which } from './scan.mjs';
 
-const UA = { 'User-Agent': 'skillset-plugin' };
+const UA = { 'User-Agent': 'skillmanager-plugin' };
 const STOP = new Set('the and for with from that this into your skill skills plugin plugins claude code agent agents'.split(' '));
 export const terms = (q) => [...new Set(String(q || '').toLowerCase().match(/[a-z0-9][a-z0-9+#.]{2,}/g) || [])].filter((w) => !STOP.has(w));
 const hits = (words, text) => { const t = String(text || '').toLowerCase(); return words.filter((w) => t.includes(w)).length; };

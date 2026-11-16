@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/logo.svg" width="112" height="112" alt="skillset logo: three bars of falling length, coral, light grey and dark grey">
+  <img src="assets/logo.svg" width="112" height="112" alt="SkillManager logo: three bars of falling length, coral, light grey and dark grey">
 </p>
 
-<h1 align="center">skillset</h1>
+<h1 align="center">SkillManager</h1>
 
 <p align="center">
   <b>Load what this project needs. Keep the rest one click away.</b><br>
@@ -13,9 +13,9 @@
 
 Everything you install in Claude Code loads in every project. Fifty skills in, each session pays for all of them, and Claude starts missing the ones that matter, because their descriptions get cut from an overflowing listing.
 
-skillset gives each project a `SKILLSET.md` with three tiers and applies it through Claude Code's own settings:
+SkillManager gives each project a `SKILLMANAGER.md` with three tiers and applies it through Claude Code's own settings:
 
-| | |
+| Tier | What it does |
 |---|---|
 | **Essential** | Loads in every session. |
 | **Useful** | Named for Claude and pulled in when a task needs it. |
@@ -27,27 +27,27 @@ On the author's setup the skill listing went from 10k tokens to 735.
 
 ```bash
 claude plugin marketplace add PieMH/SkillManager
-claude plugin install skillset@skillset
+claude plugin install skillmanager@skillmanager
 ```
 
 Needs Node 18 or newer. Works in the CLI, the Desktop app's Code tab and wrappers around the CLI.
 
 ## Use
 
-1. **Open a project.** Claude offers to tier it once. Say yes, or run `/skillset-configure`.
-2. **Click Skill set** above the prompt. The board opens: move things between tiers, see what is pending, ask Claude to find a skill for a job.
+1. **Open a project.** Claude offers to tier it once. Say yes, or run `/skillmanager-configure`.
+2. **Click SkillManager** above the prompt. The board opens: move things between tiers, see what is pending, ask Claude to find a skill for a job.
 3. **Once a week the button lights up.** Run the update pass and Claude reviews what changed upstream before anything is applied.
 
 | Command | What it does |
 |---|---|
-| `/skillset-configure` | Tiers this project: asks what it is for, proposes, writes `SKILLSET.md`. |
-| `/skillset-update` | Finds, installs, removes, re-tiers and updates. Claude also uses it when you ask in plain words. |
-| `/skillset-status` | Opens the board. |
+| `/skillmanager-configure` | Tiers this project: asks what it is for, proposes, writes `SKILLMANAGER.md`. |
+| `/skillmanager-update` | Finds, installs, removes, re-tiers and updates. Claude also uses it when you ask in plain words. |
+| `/skillmanager-status` | Opens the board. |
 
 ## Safe by default
 
 - **Nothing is installed without your yes.** Each candidate is read, never run, and scanned for risky hooks, credential grabs and prompt injection. [NVIDIA SkillSpector](https://github.com/NVIDIA/skillspector) joins in when it is installed.
-- **One file is written:** this project's `.claude/settings.local.json`, and only the entries `SKILLSET.md` lists. Never your user settings.
+- **One file is written:** this project's `.claude/settings.local.json`, and only the entries `SKILLMANAGER.md` lists. Never your user settings.
 - **The board stays on your machine:** 127.0.0.1, a one-time token, nothing loaded from the network.
 
 **[How it works, limits and network use →](docs/how-it-works.md)**

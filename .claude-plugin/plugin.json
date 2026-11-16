@@ -1,6 +1,6 @@
 {
-  "name": "skillset",
-  "version": "0.5.1",
+  "name": "skillmanager",
+  "version": "0.5.2",
   "description": "Per-project tiers for skills, plugins, MCP servers and agents: essential loads every session, useful is pulled in on demand, informative stays off. Applied at session start through Claude Code's own settings.",
   "author": {
     "name": "PieMH"

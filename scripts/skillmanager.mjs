@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// skillset CLI: the deterministic half of the plugin. The skills call it; nothing here needs a model.
+// SkillManager CLI: the deterministic half of the plugin. The skills call it; nothing here needs a model.
 import fs from 'node:fs';
 import path from 'node:path';
 import { inventory, oneLine, paths } from './lib/inventory.mjs';
@@ -10,9 +10,9 @@ import { report, scan } from './lib/scan.mjs';
 import { startServer } from './lib/serve.mjs';
 import { discover, report as discoverReport } from './lib/discover.mjs';
 
-const USAGE = `usage: skillset <command> [--project <dir>] [--json]
+const USAGE = `usage: skillmanager <command> [--project <dir>] [--json]
   inventory                       everything installed for this profile and project
-  init --essential a,b --useful c writes SKILLSET.md (the rest goes to informative) and applies it; --force to overwrite
+  init --essential a,b --useful c writes SKILLMANAGER.md (the rest goes to informative) and applies it; --force to overwrite
   move <tier> <id> [<id>...]      tier: essential | useful | informative | none (none drops the line)
   apply                           writes the tiers into .claude/settings.local.json
   status                          tiers, drift and settings that are out of step
@@ -37,9 +37,9 @@ for (let i = 0; i < argv.length; i++) {
 const [cmd, ...rest] = args;
 const projectDir = path.resolve(flags.project || process.env.CLAUDE_PROJECT_DIR || process.cwd());
 const file = path.join(projectDir, FILE);
-const fail = (msg) => { console.error(`skillset: ${msg}`); process.exit(1); };
+const fail = (msg) => { console.error(`SkillManager: ${msg}`); process.exit(1); };
 const print = (data, text) => console.log(flags.json ? JSON.stringify(data, null, 2) : text);
-const readFile = () => { try { return fs.readFileSync(file, 'utf8'); } catch { return fail(`no ${FILE} in ${projectDir}. Run /skillset-configure first.`); } };
+const readFile = () => { try { return fs.readFileSync(file, 'utf8'); } catch { return fail(`no ${FILE} in ${projectDir}. Run /skillmanager-configure first.`); } };
 
 function applied(res) {
   const out = [];
@@ -86,7 +86,7 @@ switch (cmd) {
       // Settings hooks always run, so they are listed with the essentials for information.
       essential: [...chosen.essential, ...things.filter((t) => t.kind === 'hook' && !taken.has(t.id)).map((t) => t.id)],
       useful: chosen.useful,
-      informative: things.filter((t) => TIERABLE.has(t.kind) && !taken.has(t.id) && !t.id.startsWith('plugin:skillset@')).map((t) => t.id),
+      informative: things.filter((t) => TIERABLE.has(t.kind) && !taken.has(t.id) && !t.id.startsWith('plugin:skillmanager@')).map((t) => t.id),
     };
     fs.writeFileSync(file, render({ scope: typeof flags.scope === 'string' ? flags.scope : '', tiers, things }));
     const res = apply(projectDir, parse(fs.readFileSync(file, 'utf8')).items);
@@ -95,7 +95,7 @@ switch (cmd) {
   }
   case 'move': {
     const [tier, ...ids] = rest;
-    readFile(); // a clear message when there is no SKILLSET.md
+    readFile(); // a clear message when there is no SKILLMANAGER.md
     let res;
     try { res = moveItems(projectDir, tier, ids, inventory({ projectDir }).things); } catch (err) { fail(err.message); }
     print({ moved: ids, tier, ...res }, `${tier === 'none' ? 'Dropped' : `Moved to ${tier}`}: ${ids.join(', ')}\n${applied(res)}`);
@@ -162,15 +162,15 @@ switch (cmd) {
     break;
   }
   case 'serve': {
-    readFile(); // the page shows SKILLSET.md, so it needs one
+    readFile(); // the page shows SKILLMANAGER.md, so it needs one
     // Synchronous writes: the output goes to a file that Claude reads, and process.exit follows at once.
-    const s = await startServer({ projectDir, onExit: (r) => { fs.writeSync(1, `skillset-queue: ${JSON.stringify(r)}\n`); process.exit(0); } });
-    fs.writeSync(1, `skillset-status: ready ${s.url}\n`);
+    const s = await startServer({ projectDir, onExit: (r) => { fs.writeSync(1, `skillmanager-queue: ${JSON.stringify(r)}\n`); process.exit(0); } });
+    fs.writeSync(1, `skillmanager-status: ready ${s.url}\n`);
     break; // the server keeps the process alive until Send to Claude or 30 idle minutes
   }
   case 'dismiss':
     dismiss(projectDir);
-    console.log(`skillset will not offer configuration in ${projectDir.replace(/\\/g, '/')} again.`);
+    console.log(`SkillManager will not offer configuration in ${projectDir.replace(/\\/g, '/')} again.`);
     break;
   default:
     console.log(USAGE);

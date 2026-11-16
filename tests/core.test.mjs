@@ -14,7 +14,7 @@ import { report, scan } from '../scripts/lib/scan.mjs';
 import { paths } from '../scripts/lib/inventory.mjs';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skillset-test-'));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skillmanager-test-'));
 const home = path.join(root, 'home');
 const cfg = path.join(home, '.claude-x');
 const project = path.join(root, 'proj');
@@ -97,7 +97,7 @@ assert.equal(by['hook:user/PreToolUse/Bash'].description, 'runs rtk on PreToolUs
 assert.ok(!JSON.stringify(inv).includes('SECRET'), 'no token from a hook command, MCP url or args leaks into the inventory');
 assert.deepEqual(inventory({ projectDir: project, env: { CLAUDE_CONFIG_DIR: path.join(root, 'nope') }, home }).things.map((t) => t.id), ['skill:deploy', 'mcp:pg'], 'a missing config dir is not an error');
 
-// --- SKILLSET.md ---------------------------------------------------------------------------------
+// --- SKILLMANAGER.md ---------------------------------------------------------------------------------
 const tiers = { essential: ['plugin:tool@mkt', 'hook:user/PreToolUse/Bash'], useful: ['skill:humanizer', 'plugin:notes@mkt'], informative: ['skill:gsap-core', 'mcp:pg', 'agent:reviewer'] };
 const text = render({ scope: 'A test project.', tiers, things: inv.things });
 const parsed = parse(text);
@@ -136,7 +136,7 @@ res = apply(project, parsed.items);
 assert.deepEqual([res.wrote, res.changes], [false, []], 'apply is idempotent');
 res = apply(project, parse(setTier(text, 'skill:gsap-core', 'none')).items, ['skill:gsap-core']);
 assert.equal('gsap-core' in JSON.parse(fs.readFileSync(local, 'utf8')).skillOverrides, false, 'a dropped id is no longer managed');
-assert.equal(apply(project, parse('## Essential\n- `plugin:skillset@skillset` x\n## Informative\n- `plugin:skillset@x` y\n').items).wrote, false, 'skillset never switches itself off');
+assert.equal(apply(project, parse('## Essential\n- `plugin:skillmanager@skillmanager` x\n## Informative\n- `plugin:skillmanager@x` y\n').items).wrote, false, 'SkillManager never switches itself off');
 fs.writeFileSync(local, '{ broken');
 res = apply(project, parsed.items);
 assert.match(res.error, /not valid JSON/);
@@ -148,12 +148,12 @@ const drift = reconcile(parse(text + '\n## Useful\n- `skill:ghost` — gone\n').
 assert.deepEqual(drift.missing, ['skill:ghost']);
 assert.ok(drift.untiered.includes('skill:deploy') && !drift.untiered.some((id) => id.startsWith('hook:')));
 const d = digest({ items: parsed.items, things: inv.things });
-assert.match(d, /^skillset: /);
+assert.match(d, /^SkillManager: /);
 assert.match(d, /- skill `humanizer`: Rewrite AI-sounding text so it reads like the writer\.\n/);
 assert.match(d, /plugin `notes@mkt` \(off here\): Note-taking instructions\. Skills: take-notes\. Usable right now by reading a SKILL\.md under .*\/notes\/2\.0\.0\/skills\/\.\n/);
 assert.match(d, /To load an off plugin: `claude plugin enable <id> --scope local`/);
 assert.match(d, /Informative tier: 3 more/);
-assert.match(d, /not in SKILLSET\.md yet: .*`skill:deploy`/);
+assert.match(d, /not in SKILLMANAGER\.md yet: .*`skill:deploy`/);
 assert.ok(d.length < 4000);
 const brief = digest({ items: parsed.items, things: inv.things, cap: 300 });
 assert.ok(!brief.includes('Rewrite AI-sounding') && brief.includes('`skill:humanizer`'), 'over the cap, the useful tier falls back to names');
@@ -161,39 +161,39 @@ assert.ok(!brief.includes('Rewrite AI-sounding') && brief.includes('`skill:human
 // --- session start -------------------------------------------------------------------------------
 const spawned = [];
 const quiet = { spawn: (...a) => { spawned.push(a); return { unref() {} }; } };
-assert.match(sessionStart({ projectDir: project, env, home, ...quiet }), /no SKILLSET\.md.*\/skillset-configure.*dismiss/s);
+assert.match(sessionStart({ projectDir: project, env, home, ...quiet }), /no SKILLMANAGER\.md.*\/skillmanager-configure.*dismiss/s);
 assert.equal(sessionStart({ projectDir: home, env, home }), '', 'the home dir is not a project');
 dismiss(project, env, home);
 assert.equal(sessionStart({ projectDir: project, env, home, ...quiet }), '', 'a dismissed project stays quiet');
-write(path.join(project, 'SKILLSET.md'), text);
+write(path.join(project, 'SKILLMANAGER.md'), text);
 const started = sessionStart({ projectDir: project, env, home, ...quiet });
 assert.match(started, /Re-applied 4 tier setting\(s\).*\/reload-plugins/);
 assert.match(started, /Weekly: once, .*look for new skills/, 'the session that starts the weekly check offers discovery');
 assert.equal(JSON.parse(fs.readFileSync(local, 'utf8')).skillOverrides.humanizer, 'name-only');
 const again = sessionStart({ projectDir: project, env, home, ...quiet });
 assert.ok(!again.includes('Re-applied') && !again.includes('Weekly:'), 'a second start re-applies nothing and offers nothing');
-write(path.join(project, 'SKILLSET.md'), '# Skills\n\nSomething else entirely.\n');
-assert.equal(sessionStart({ projectDir: project, env, home, ...quiet }), '', 'a SKILLSET.md without tier items is left alone');
+write(path.join(project, 'SKILLMANAGER.md'), '# Skills\n\nSomething else entirely.\n');
+assert.equal(sessionStart({ projectDir: project, env, home, ...quiet }), '', 'a SKILLMANAGER.md without tier items is left alone');
 assert.equal(spawned.length, 1, 'the weekly check starts once, then waits a week');
 assert.ok(spawned[0][1].includes('check') && spawned[0][2].detached, 'it runs detached');
 
 // --- the hook and the CLI as processes -----------------------------------------------------------
 const childEnv = { ...process.env, CLAUDE_CONFIG_DIR: cfg, CLAUDE_PROJECT_DIR: project, HOME: home, USERPROFILE: home };
 const node = (script, args = [], extra = {}) => spawnSync(process.execPath, [path.join(repo, script), ...args], { encoding: 'utf8', env: { ...childEnv, ...extra } });
-write(path.join(project, 'SKILLSET.md'), text);
+write(path.join(project, 'SKILLMANAGER.md'), text);
 let run = node('hooks/session-start.mjs');
 assert.equal(run.status, 0);
-assert.match(run.stdout, /^skillset: this project tiers/);
+assert.match(run.stdout, /^SkillManager: this project tiers/);
 write(path.join(root, 'a-file'), 'x');
 run = node('hooks/session-start.mjs', [], { CLAUDE_CONFIG_DIR: path.join(root, 'a-file'), CLAUDE_PROJECT_DIR: path.join(root, 'missing') });
 assert.deepEqual([run.status, run.stderr], [0, ''], 'the hook never fails a session');
 
 const fresh = path.join(root, 'fresh');
 fs.mkdirSync(fresh);
-const cli = (...args) => node('scripts/skillset.mjs', args, { CLAUDE_PROJECT_DIR: fresh });
+const cli = (...args) => node('scripts/skillmanager.mjs', args, { CLAUDE_PROJECT_DIR: fresh });
 run = cli('init', '--essential', 'plugin:tool@mkt', '--useful', 'skill:humanizer,connector:claude.ai Slack');
 assert.equal(run.status, 0, run.stderr);
-const made = parse(fs.readFileSync(path.join(fresh, 'SKILLSET.md'), 'utf8')).items;
+const made = parse(fs.readFileSync(path.join(fresh, 'SKILLMANAGER.md'), 'utf8')).items;
 assert.deepEqual(made.filter((i) => i.tier === 'essential').map((i) => i.id), ['plugin:tool@mkt', 'hook:user/PreToolUse/Bash']);
 assert.deepEqual(made.filter((i) => i.tier === 'useful').map((i) => i.id), ['skill:humanizer', 'connector:claude.ai Slack']);
 assert.ok(made.some((i) => i.tier === 'informative' && i.id === 'plugin:notes@mkt'));
@@ -204,7 +204,7 @@ assert.match(run.stdout, /skill: name-only → off \(1\): humanizer/);
 assert.equal(cli('move', 'useful', 'hook:user/PreToolUse/Bash').status, 1, 'hooks cannot be tiered');
 run = cli('status', '--json');
 assert.deepEqual(JSON.parse(run.stdout).drift, { untiered: [], missing: [] });
-assert.match(cli('digest').stdout, /^skillset: /);
+assert.match(cli('digest').stdout, /^SkillManager: /);
 assert.equal(cli('nonsense').status, 1);
 
 // --- update check --------------------------------------------------------------------------------
@@ -254,7 +254,7 @@ const st = readState(p);
 assert.ok(st.checkedAt && st.dismissed?.length, 'the check keeps the rest of the state');
 assert.deepEqual(pending(st).map((u) => u.id).sort(), ['plugin:local@dirmkt', 'plugin:tool@mkt', 'skill:humanizer'], 'a skipped version is not proposed again');
 assert.equal(pending({ ...st, skipped: { 'skill:cloned': { latest: 'older' } } }).length, 4, 'a newer version than the skipped one is proposed');
-assert.match(digest({ items: parsed.items, things: inv.things, updates: pending(st) }), /Updates available upstream: .*`plugin:local@dirmkt 0\.2\.0 → 0\.3\.0`.*\/skillset-update/);
+assert.match(digest({ items: parsed.items, things: inv.things, updates: pending(st) }), /Updates available upstream: .*`plugin:local@dirmkt 0\.2\.0 → 0\.3\.0`.*\/skillmanager-update/);
 
 // --- scan ----------------------------------------------------------------------------------------
 const bad = path.join(root, 'bad-plugin');
@@ -312,7 +312,7 @@ const call = (method, route, { headers = {}, body } = {}) => new Promise((resolv
   if (data) rq.write(data);
   rq.end();
 });
-const auth = { 'x-skillset-token': page.token };
+const auth = { 'x-skillmanager-token': page.token };
 const post = (route, body, headers = {}) => call('POST', route, { body, headers: { ...auth, 'content-type': 'application/json', ...headers } });
 
 assert.match(page.url, /^http:\/\/127\.0\.0\.1:\d+\/\?t=[0-9a-f]{48}$/);
@@ -333,7 +333,7 @@ assert.equal(got.json.scope, 'A test project.');
 assert.equal((await call('POST', '/api/move', { headers: auth, body: '{"ids":["skill:gsap-core"],"tier":"useful"}' })).status, 415, 'JSON content type only');
 got = await post('/api/move', { ids: ['skill:gsap-core'], tier: 'useful' });
 assert.equal(got.status, 200, got.text);
-assert.equal(parse(fs.readFileSync(path.join(project, 'SKILLSET.md'), 'utf8')).items.find((i) => i.id === 'skill:gsap-core').tier, 'useful');
+assert.equal(parse(fs.readFileSync(path.join(project, 'SKILLMANAGER.md'), 'utf8')).items.find((i) => i.id === 'skill:gsap-core').tier, 'useful');
 assert.equal(JSON.parse(fs.readFileSync(local, 'utf8')).skillOverrides['gsap-core'], 'name-only', 'a move from the page is applied');
 assert.ok(got.json.state.tiers.useful.some((i) => i.id === 'skill:gsap-core'));
 got = await post('/api/move', { ids: ['hook:user/PreToolUse/Bash'], tier: 'useful' });
@@ -366,7 +366,7 @@ skip(p, 'skill:humanizer', 'not now');
 const quietPage = await startServer({ projectDir: project, env, home, io, onExit: () => {} });
 got = await new Promise((resolve, reject) => {
   const data = '{}';
-  const rq = http.request({ host: '127.0.0.1', port: quietPage.port, method: 'POST', path: '/api/pass', headers: { host: `127.0.0.1:${quietPage.port}`, 'x-skillset-token': quietPage.token, 'content-type': 'application/json', 'content-length': 2 } }, (rs) => {
+  const rq = http.request({ host: '127.0.0.1', port: quietPage.port, method: 'POST', path: '/api/pass', headers: { host: `127.0.0.1:${quietPage.port}`, 'x-skillmanager-token': quietPage.token, 'content-type': 'application/json', 'content-length': 2 } }, (rs) => {
     let s = '';
     rs.on('data', (c) => { s += c; });
     rs.on('end', () => resolve(JSON.parse(s)));

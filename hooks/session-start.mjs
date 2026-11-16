@@ -1,4 +1,4 @@
-// SessionStart hook: applies this project's SKILLSET.md and prints the digest the model reads.
+// SessionStart hook: applies this project's SKILLMANAGER.md and prints the digest the model reads.
 // It does not read stdin (Claude Code on Windows can leave a hook's stdin open, which would hang it)
 // and it stays silent on any error: a broken hook here would get in the way of every session.
 // Once a week it launches the update check as a detached process and does not wait for it.

@@ -93,7 +93,7 @@ export function startServer({ projectDir, env = process.env, home, idleMs = 30 *
         });
         return res.end(html);
       }
-      if (req.headers['x-skillset-token'] !== token) return json(res, 403, { error: 'missing or wrong token' });
+      if (req.headers['x-skillmanager-token'] !== token) return json(res, 403, { error: 'missing or wrong token' });
       if (req.method === 'GET' && url.pathname === '/api/state') return json(res, 200, snapshot());
       if (req.method !== 'POST') return json(res, 404, { error: 'not found' });
       if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return json(res, 415, { error: 'send JSON' });

@@ -1,7 +1,7 @@
 // Facts about a plugin, a skill or a folder of skills before it is installed: what it adds, what it
 // collides with in this profile, what it needs, and lines that look risky. The target is untrusted data:
 // it is read, never run. `claude plugin validate` and NVIDIA SkillSpector run only when on the PATH.
-// The /skillset-update skill reads these facts and decides; nothing here gives a verdict.
+// The /skillmanager-update skill reads these facts and decides; nothing here gives a verdict.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';

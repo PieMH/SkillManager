@@ -1,13 +1,13 @@
 // Update check: which installed plugins and skills have something newer upstream. It reads Claude Code's
 // files and asks GitHub; it never changes an install. The SessionStart hook starts it once a week in the
-// background, and /skillset-update runs it on demand. Results live in the per-account state file.
+// background, and /skillmanager-update runs it on demand. Results live in the per-account state file.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readJson, samePath } from './inventory.mjs';
 
 const WEEK = 7 * 24 * 3600 * 1000;
-const UA = { 'User-Agent': 'skillset-plugin' }; // GitHub's API refuses requests without one
+const UA = { 'User-Agent': 'skillmanager-plugin' }; // GitHub's API refuses requests without one
 
 export const readState = (p) => readJson(p.stateFile) || {};
 export function writeState(p, state) {

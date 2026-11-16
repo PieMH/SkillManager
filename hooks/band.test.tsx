@@ -6,7 +6,7 @@ const NOW = Date.parse('2026-11-16T12:00:00Z')
 const SURFACES = ['terminal', 'desktop'] as const
 
 const band = (surface: (typeof SURFACES)[number]) => ({
-  plugin: 'skillset',
+  plugin: 'skillmanager',
   surface,
   component: 'AbovePrompt',
   props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 8, bodyColumns: 100, scroll: { offset: 0, bodyRows: 7 }, view: {} },
@@ -21,9 +21,9 @@ function engine(on: On, w: World) {
   on('session.cwd', () => ({ value: 'C:\\Projects\\demo' }))
   on('env.get', (_, e) => ({ value: e.name === 'CLAUDE_CONFIG_DIR' ? 'C:\\cfg' : undefined }))
   on('clock.now', () => ({ value: NOW }))
-  on('fs.exists', (_, e) => ({ value: w.tiered && ends(e.path, 'demo/skillset.md') }))
+  on('fs.exists', (_, e) => ({ value: w.tiered && ends(e.path, 'demo/skillmanager.md') }))
   on('fs.read', (_, e) => {
-    if (w.state && ends(e.path, 'cfg/skillset/state.json')) return { value: JSON.stringify(w.state) }
+    if (w.state && ends(e.path, 'cfg/skillmanager/state.json')) return { value: JSON.stringify(w.state) }
     throw new Error(`ENOENT ${e.path}`)
   })
   on('command.run', (_, e) => {
@@ -51,7 +51,7 @@ test('a due pass is marked, the pending count leaves out skipped versions, and t
     await ui.press({ key: 'board' })
     await ui.unmount()
   }
-  expect(w.ran).toEqual(['skillset:skillset-status', 'skillset:skillset-status'])
+  expect(w.ran).toEqual(['skillmanager:skillmanager-status', 'skillmanager:skillmanager-status'])
 })
 
 test('a recent pass and nothing pending leave only the button', async ($, on) => {
@@ -77,12 +77,12 @@ test('an untiered project offers set-up, and a dismissed one gets no row', async
   engine(on, w)
   let ui = await $.ui.mount(band('desktop'))
   await ui.press({ key: 'configure' })
-  expect(w.ran).toEqual(['skillset:skillset-configure'])
+  expect(w.ran).toEqual(['skillmanager:skillmanager-configure'])
   await ui.unmount()
 
   w.state = { dismissed: ['c:/projects/DEMO/'] } // the hook writes forward slashes; Windows paths ignore case
   ui = await $.ui.mount(band('desktop'))
   expect(await ui.find({ type: 'Button', key: 'configure' })).toBe(undefined)
-  expect(await ui.find({ type: 'Text', text: /skillset/ })).toBe(undefined)
+  expect(await ui.find({ type: 'Text', text: /SkillManager/ })).toBe(undefined)
   await ui.unmount()
 })

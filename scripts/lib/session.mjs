@@ -7,7 +7,7 @@ import { inventory, paths, samePath } from './inventory.mjs';
 import { FILE, apply, digest, parse } from './tiers.mjs';
 import { due, pending, readState, writeState } from './updates.mjs';
 
-const CLI = fileURLToPath(new URL('../skillset.mjs', import.meta.url)).replace(/\\/g, '/');
+const CLI = fileURLToPath(new URL('../skillmanager.mjs', import.meta.url)).replace(/\\/g, '/');
 
 export function dismiss(projectDir, env = process.env, home) {
   const p = paths(env, home);
@@ -33,12 +33,12 @@ export function sessionStart({ projectDir, env = process.env, home, now = Date.n
   try { text = fs.readFileSync(path.join(projectDir, FILE), 'utf8'); } catch {
     const dismissed = (readState(p).dismissed || []).some((d) => samePath(d, projectDir));
     if (dismissed || samePath(projectDir, p.home)) return ''; // the home dir is not a project
-    return 'skillset: this project has no SKILLSET.md, so every installed skill, plugin and MCP server loads here. '
-      + 'Once, when it does not interrupt the user\'s request, offer to tier them for this project with /skillset-configure. '
+    return 'SkillManager: this project has no SKILLMANAGER.md, so every installed skill, plugin and MCP server loads here. '
+      + 'Once, when it does not interrupt the user\'s request, offer to tier them for this project with /skillmanager-configure. '
       + `If the user declines, run \`node "${CLI}" dismiss\` and do not offer again.\n`;
   }
   const { items } = parse(text);
-  if (!items.length) return ''; // a SKILLSET.md with no tier items is not ours to act on
+  if (!items.length) return ''; // a SKILLMANAGER.md with no tier items is not ours to act on
   const state = readState(p);
   const weekly = startCheck(p, state, now, env, spawn);
   const { things } = inventory({ projectDir, env, home: p.home });
