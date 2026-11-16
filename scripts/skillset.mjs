@@ -2,9 +2,11 @@
 // skillset CLI: the deterministic half of the plugin. The skills call it; nothing here needs a model.
 import fs from 'node:fs';
 import path from 'node:path';
-import { inventory, oneLine } from './lib/inventory.mjs';
+import { inventory, oneLine, paths } from './lib/inventory.mjs';
 import { FILE, TIERABLE, TIERS, apply, digest, itemLine, parse, reconcile, render, setTier, split, summarize } from './lib/tiers.mjs';
 import { dismiss } from './lib/session.mjs';
+import { check, pending, readState, writeState } from './lib/updates.mjs';
+import { report, scan } from './lib/scan.mjs';
 
 const USAGE = `usage: skillset <command> [--project <dir>] [--json]
   inventory                       everything installed for this profile and project
@@ -13,6 +15,9 @@ const USAGE = `usage: skillset <command> [--project <dir>] [--json]
   apply                           writes the tiers into .claude/settings.local.json
   status                          tiers, drift and settings that are out of step
   digest                          what the SessionStart hook prints
+  check [--cached]                which plugins and skills have updates upstream (--cached: the last result, no network)
+  skip <id> [--reason text]       stop proposing the pending update of <id> until a newer one appears
+  scan <path> [--no-external]     facts about a plugin or skill folder before installing it
   dismiss                         stop offering configuration in this project`;
 
 const argv = process.argv.slice(2);
@@ -22,7 +27,7 @@ for (let i = 0; i < argv.length; i++) {
   const m = /^--([\w-]+)(?:=(.*))?$/.exec(argv[i]);
   if (!m) args.push(argv[i]);
   else if (m[2] !== undefined) flags[m[1]] = m[2];
-  else if (['json', 'force'].includes(m[1]) || argv[i + 1] === undefined) flags[m[1]] = true;
+  else if (['json', 'force', 'cached', 'quiet', 'no-external'].includes(m[1]) || argv[i + 1] === undefined) flags[m[1]] = true;
   else flags[m[1]] = argv[++i];
 }
 const [cmd, ...rest] = args;
@@ -120,6 +125,40 @@ switch (cmd) {
   case 'digest': {
     const { items } = parse(readFile());
     process.stdout.write(digest({ items, things: inventory({ projectDir }).things }));
+    break;
+  }
+  case 'check': {
+    const p = paths();
+    if (!flags.cached) {
+      writeState(p, { ...readState(p), checkStartedAt: new Date().toISOString() });
+      await check(p);
+    }
+    const st = readState(p);
+    const list = pending(st);
+    if (flags.quiet) break;
+    const out = [st.checkedAt ? `Last check ${st.checkedAt.slice(0, 16).replace('T', ' ')}: ${list.length} update(s) pending.` : 'No update check has run yet. Run `check` without --cached.'];
+    for (const u of list) out.push(`- ${u.id}: ${u.installed} → ${u.latest}  (${u.how})`);
+    const skipped = Object.entries(st.skipped || {});
+    if (skipped.length) out.push(`Skipped: ${skipped.map(([id, s]) => `${id} ${s.latest}${s.reason ? ` (${s.reason})` : ''}`).join(', ')}`);
+    if (st.checkErrors?.length) out.push(`Not checked: ${st.checkErrors.join('; ')}`);
+    print({ checkedAt: st.checkedAt || null, updates: list, skipped: st.skipped || {}, errors: st.checkErrors || [] }, out.join('\n'));
+    break;
+  }
+  case 'skip': {
+    const [id] = rest;
+    const p = paths();
+    const st = readState(p);
+    const u = (st.updates || []).find((x) => x.id === id);
+    if (!u) fail(`no pending update for ${id}. Run \`check --cached\` for the list.`);
+    writeState(p, { ...st, skipped: { ...st.skipped, [id]: { latest: u.latest, reason: typeof flags.reason === 'string' ? flags.reason : '', at: new Date().toISOString().slice(0, 10) } } });
+    console.log(`Skipped ${id} ${u.latest}. A newer version will be proposed again.`);
+    break;
+  }
+  case 'scan': {
+    if (!rest[0]) fail('usage: scan <path>');
+    let r;
+    try { r = scan(rest[0], { things: inventory({ projectDir }).things, external: !flags['no-external'] }); } catch (err) { fail(err.message); }
+    print(r, report(r));
     break;
   }
   case 'dismiss':

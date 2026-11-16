@@ -12,14 +12,18 @@ A Claude Code plugin that is also its own one-plugin marketplace (`.claude-plugi
 | `scripts/lib/inventory.mjs` | What is installed, read from Claude Code's files on disk | the hook and the CLI |
 | `scripts/lib/tiers.mjs` | Parse and write `SKILLSET.md`, turn tiers into settings, build the digest | the hook and the CLI |
 | `scripts/lib/session.mjs` | What the hook does, as a testable function | the hook |
+| `scripts/lib/updates.mjs` | The update check and the per-account state file | the CLI; the hook reads its state |
+| `scripts/lib/scan.mjs` | Compliance facts about a plugin or skill folder before install | the CLI |
 | `scripts/skillset.mjs` | The CLI the skills call | the model, through Bash |
 | `skills/skillset-configure/SKILL.md` | The configure workflow | the model |
+| `skills/skillset-update/SKILL.md` | Status, moves, install, uninstall, drift, updates | the model |
 
-`ProjectScope.txt` is the original brief. The approved plan covers five phases; phase 1 (this code) is the core.
+`ProjectScope.txt` is the original brief. The approved plan covers five phases: phase 1 is the core, phase 2 is change management (update check, `scan`, `/skillset-update`).
 
 ## Invariants: don't break these
 
-- **The hook never fails and never blocks.** It reads no stdin, spawns nothing, reads files only, exits 0 on every error and prints nothing when it has nothing to say. It runs at the start of every session of every user.
+- **The hook never fails and never blocks.** It reads no stdin, reads files only, exits 0 on every error and prints nothing when it has nothing to say. The one process it starts is the weekly `check`, detached, with no stdio, never awaited. It runs at the start of every session of every user.
+- **Checking and scanning change nothing.** `check` reads Claude Code's files and public GitHub data; `scan` reads the target and never runs it. Installs, updates and uninstalls happen only through native commands the user approves in `/skillset-update`.
 - **The hook's output is paid for in every session.** Keep the digest short (target under 4,000 characters; Claude Code cuts hook output at 10,000). Tighten before you add a line.
 - **Only documented switches are written.** `skillOverrides`, `enabledPlugins` and `disabledMcpjsonServers`. A tier with no documented switch is reported as recorded, not enforced. Do not write a setting on a guess.
 - **Only the project's `.claude/settings.local.json` is written**, and only entries for ids listed in `SKILLSET.md`. Never user-level settings, never another key. A settings file that is not valid JSON is left alone.

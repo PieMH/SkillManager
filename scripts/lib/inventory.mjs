@@ -54,7 +54,7 @@ export function oneLine(s, max = 140) {
   return cut.length > max ? cut.slice(0, max - 1).trimEnd() + '…' : cut;
 }
 
-function skillsIn(dir) {
+export function skillsIn(dir) {
   const out = [];
   for (const folder of listDir(dir)) {
     const text = readText(path.join(dir, folder, 'SKILL.md')); // follows junctions; '' for plain files
@@ -65,7 +65,7 @@ function skillsIn(dir) {
   return out;
 }
 
-const mdIn = (dir) => listDir(dir).filter((n) => n.endsWith('.md')).map((n) => {
+export const mdIn = (dir) => listDir(dir).filter((n) => n.endsWith('.md')).map((n) => {
   const fm = frontmatter(readText(path.join(dir, n)));
   return { name: fm.name || n.slice(0, -3), description: fm.description || '', file: path.join(dir, n) };
 });
