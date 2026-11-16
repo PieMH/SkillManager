@@ -14,15 +14,18 @@ A Claude Code plugin that is also its own one-plugin marketplace (`.claude-plugi
 | `scripts/lib/session.mjs` | What the hook does, as a testable function | the hook |
 | `scripts/lib/updates.mjs` | The update check and the per-account state file | the CLI; the hook reads its state |
 | `scripts/lib/scan.mjs` | Compliance facts about a plugin or skill folder before install | the CLI |
+| `scripts/lib/serve.mjs`, `scripts/lib/page.html` | The status page: a 127.0.0.1 server and its one self-contained page | the CLI (`serve`) |
 | `scripts/skillset.mjs` | The CLI the skills call | the model, through Bash |
 | `skills/skillset-configure/SKILL.md` | The configure workflow | the model |
 | `skills/skillset-update/SKILL.md` | Status, moves, install, uninstall, drift, updates | the model |
+| `skills/skillset-status/SKILL.md` | Start the status page and handle its queue | the model |
 
-`ProjectScope.txt` is the original brief. The approved plan covers five phases: phase 1 is the core, phase 2 is change management (update check, `scan`, `/skillset-update`).
+`ProjectScope.txt` is the original brief. The approved plan covers five phases: phase 1 is the core, phase 2 is change management (update check, `scan`, `/skillset-update`), phase 3 is the status page.
 
 ## Invariants: don't break these
 
 - **The hook never fails and never blocks.** It reads no stdin, reads files only, exits 0 on every error and prints nothing when it has nothing to say. The one process it starts is the weekly `check`, detached, with no stdio, never awaited. It runs at the start of every session of every user.
+- **The status page is local and token-gated.** It listens on 127.0.0.1 only, checks the Host and Origin headers and the per-launch token on every request, sends a strict CSP and renders every value as text. It applies tier moves, checks and skips itself; installing and uninstalling only ever go to the queue for Claude.
 - **Checking and scanning change nothing.** `check` reads Claude Code's files and public GitHub data; `scan` reads the target and never runs it. Installs, updates and uninstalls happen only through native commands the user approves in `/skillset-update`.
 - **The hook's output is paid for in every session.** Keep the digest short (target under 4,000 characters; Claude Code cuts hook output at 10,000). Tighten before you add a line.
 - **Only documented switches are written.** `skillOverrides`, `enabledPlugins` and `disabledMcpjsonServers`. A tier with no documented switch is reported as recorded, not enforced. Do not write a setting on a guess.

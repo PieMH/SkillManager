@@ -2,3 +2,4 @@
 node_modules/
 # Each machine's own tiers: personal stack and local paths.
 SKILLSET.md
+.taste-skill/

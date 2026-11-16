@@ -23,9 +23,14 @@ Needs Node 18 or newer on the PATH. Works wherever Claude Code runs plugins and 
 
 - `/skillset-configure` asks what the project is for, shows what is installed against a proposed tiering, writes `SKILLSET.md`, applies it and adds a pointer to `CLAUDE.md`. In a project without a `SKILLSET.md`, Claude offers this once; decline and it stays quiet.
 - `/skillset-update` shows the status, moves things between tiers, installs through a compliance check, uninstalls, reconciles drift and reviews pending updates. Claude also uses it when you ask it to install or remove something.
+- `/skillset-status` opens the status page (below).
 - Re-tier by moving a line to another section of `SKILLSET.md`. The next session applies it.
 
-A status page and discovery of new skills are next.
+Discovery of new skills is next.
+
+### Status page
+
+`/skillset-status` starts a small local server and opens the page in the session's browser panel (in CCWrapper) or gives you the link. It shows the three tiers, anything not tiered yet and the pending updates. Moving something between tiers, checking for updates and skipping one apply at once, with no model and no tokens. Reviewing an update, uninstalling, finding alternatives and free-text research questions go to a queue; **Send to Claude** stops the page and hands the queue to the session, which handles it with `/skillset-update`. The server listens on 127.0.0.1 only, needs the per-launch token in its link, refuses other hosts and origins, loads nothing from the network, and stops after 30 minutes without use.
 
 ### Compliance check
 
@@ -59,7 +64,7 @@ The hook reads files only and never spawns `claude`; once a week it starts the u
 
 ## Limits
 
-- **Nothing is unloaded mid-session.** Tiers apply when a session starts. Plugin changes need `/reload-plugins` or a new session.
+- **Plugins change at the next reload; skills change at once.** A skill's tier takes effect as soon as `.claude/settings.local.json` changes, even mid-session (checked in the CLI): an informative skill cannot be invoked, and moving it to useful makes it invocable again. Plugin changes need `/reload-plugins` or a new session.
 - **A plugin is all or nothing.** `skillOverrides` does not reach plugin skills, so they follow their plugin.
 - **Recorded, not enforced:** agents, user-scope MCP servers and claude.ai connectors. Claude Code documents no per-project switch for them, so an informative tier there is a note for the agent.
 - **Synced and built-in items obey the switches** (checked in the CLI, Claude Code 2.1.325): `skillOverrides` hides skills synced from a claude.ai account and built-in skills, and `enabledPlugins` switches off plugins synced from it. Not yet checked in the Desktop Code tab or in wrappers.
@@ -72,7 +77,7 @@ The hook reads files only and never spawns `claude`; once a week it starts the u
 No build step and no dependencies: Node built-ins only.
 
 ```bash
-node tests/core.test.mjs                 # inventory, tiers, settings, digest, hook, update check, scan, CLI
+node tests/core.test.mjs                 # inventory, tiers, settings, digest, hook, update check, scan, page server, CLI
 node scripts/skillset.mjs inventory      # what the tool sees on this machine
 claude plugin validate .
 ```

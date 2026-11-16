@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Skill set</title>
+<style nonce="{{NONCE}}">
+/* True-black flat: elevation by lightness alone, colour only on data.
+   Grid: one centred column of at most 1152px. With the rail, 798 + 14 + 340 = 1152. */
+:root {
+  --ground: #000000; --surface: #111111; --hover: #1a1a1a; --raised: #2a2a2a; --raised-hover: #333333;
+  --border: #1a1a1a; --rule: #161616; --control: #444444; --control-hover: #6b6b6b;
+  --text: #ffffff; --muted: #b4b4b4; --faint: #949494;
+  --accent: #ff7d4d;                 /* the one data hue: what loads in every session */
+  --tier-useful: #e6e6e6; --tier-informative: #444444;
+  --negative: #f47b7f; --warning: #e5a93b;
+  --pill-neutral-bg: #222222; --pill-warning-bg: #2b2414; --pill-warning-ink: #e5a93b;
+  --radius-card: 20px; --radius-inner: 14px; --radius-control: 999px;
+  --gap: 14px; --pad: 22px; --control-height: 32px;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { color-scheme: dark; -webkit-font-smoothing: antialiased; scrollbar-color: var(--raised) var(--ground); accent-color: var(--text); caret-color: var(--text); }
+::selection { background: #3a3a3a; color: var(--text); }
+body { margin: 0; background: var(--ground); color: var(--text); font: 14px/20px var(--font); }
+:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Shell: a 48px top bar on the ground, the product and its scope on the left, search on the right. */
+.top { height: 48px; border-bottom: 1px solid var(--border); }
+.top .in, .page { max-width: 1152px; margin: 0 auto; padding: 0 24px; }
+.top .in { height: 100%; display: flex; align-items: center; gap: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 600; white-space: nowrap; }
+.brand svg { flex: none; }
+.scope { color: var(--muted); font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+.scope::before { content: "/"; color: var(--faint); margin-right: 10px; }
+#filter { margin-left: auto; width: 280px; min-width: 120px; flex: 0 1 280px; height: 32px; padding: 0 14px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--ground); color: var(--text); font: inherit; font-size: 13px; }
+#filter::placeholder { color: var(--faint); }
+#filter:hover { border-color: var(--control-hover); }
+
+.page { padding-top: 28px; padding-bottom: 112px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--gap); align-items: start; }
+@media (max-width: 999px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+/* Title row: a noun, then the finding. */
+h1 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 0; }
+#finding { margin: 4px 0 0; color: var(--muted); max-width: 68ch; text-wrap: pretty; }
+
+/* The loadout bar: how much of what is installed this project loads. Its segments are the tabs' dots. */
+.loadout { display: flex; gap: 2px; height: 6px; margin: 20px 0 var(--gap); }
+.loadout span { border-radius: 999px; min-width: 6px; }
+.t-essential { background: var(--accent); } .t-useful { background: var(--tier-useful); } .t-informative { background: var(--tier-informative); } .t-untiered { background: var(--warning); }
+
+/* The tier counts are the list's tabs: one #111 container, the selected cell one step lighter. */
+.tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 6px; background: var(--surface); border-radius: var(--radius-card); }
+.tab { display: grid; gap: 2px; justify-items: start; padding: 10px 14px 12px; border: 0; border-radius: var(--radius-inner); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: background-color .15s; }
+.tab:hover { background: var(--hover); }
+.tab[aria-pressed="true"] { background: var(--raised); }
+.tab .lab { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.tab[aria-pressed="true"] .lab { color: var(--text); }
+.tab .val { font-size: 24px; line-height: 32px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.tab[aria-pressed="true"] .val { font-weight: 500; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+
+/* Toolbar between the tabs and the list. */
+.bar { display: flex; align-items: center; gap: 12px; min-height: 36px; margin: 22px 0 6px; }
+.bar p { margin: 0; flex: 1; min-width: 0; color: var(--muted); }
+.stamp { color: var(--faint); font-size: 12px; white-space: nowrap; }
+
+/* Rows sit on the ground, split by faint rules. */
+ul.rows { list-style: none; margin: 0; padding: 0; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "id ctl" "desc ctl"; column-gap: 16px; row-gap: 2px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.id { grid-area: id; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ident { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 13px; color: var(--faint); }
+.ident b { color: var(--text); font-weight: 500; }
+.tag { flex: none; white-space: nowrap; font-size: 12px; line-height: 20px; padding: 0 8px; border-radius: 999px; background: var(--pill-neutral-bg); color: var(--muted); }
+.tag.missing { background: var(--pill-warning-bg); color: var(--pill-warning-ink); }
+.desc { grid-area: desc; margin: 0; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; overflow-wrap: anywhere; color: var(--muted); font-size: 13px; }
+.ver { color: var(--muted); font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.ctl { grid-area: ctl; display: flex; align-items: center; gap: 6px; }
+.fixed { width: 128px; padding: 0 12px; color: var(--faint); font-size: 13px; }
+.slot { width: 32px; flex: none; }
+.empty { margin: 0; padding: 14px 16px; border-radius: var(--radius-inner); background: var(--surface); color: var(--muted); }
+.more-rows { padding: 14px 0 0; }
+
+/* Controls: pills. The primary is inverted (white, black label); the rest are outlined. */
+select, button, textarea, input { font: inherit; font-size: 13px; color: var(--text); }
+select { width: 128px; height: var(--control-height); padding: 0 10px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--ground); cursor: pointer; }
+select:hover { border-color: var(--control-hover); }
+.btn { height: var(--control-height); padding: 0 14px; border: 1px solid var(--control); border-radius: var(--radius-control); background: none; cursor: pointer; white-space: nowrap; transition: border-color .15s, background-color .15s, transform .1s cubic-bezier(0.23, 1, 0.32, 1); }
+.btn:hover:not(:disabled) { border-color: var(--control-hover); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.primary { height: 36px; padding: 0 18px; border: 0; background: var(--text); color: var(--ground); font-weight: 600; }
+.primary:hover:not(:disabled) { background: var(--muted); }
+.icon { width: 32px; height: 32px; padding: 0; display: inline-grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--muted); cursor: pointer; }
+.icon:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+button:disabled, select:disabled, textarea:disabled, input:disabled { opacity: .45; cursor: default; }
+svg.i { width: 16px; height: 16px; display: block; }
+
+/* The row menu floats, so it is the one raised surface. */
+.more { position: relative; }
+.more > summary { list-style: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); cursor: pointer; }
+.more > summary::-webkit-details-marker { display: none; }
+.more > summary:hover, .more[open] > summary { background: var(--hover); color: var(--text); }
+.menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; min-width: 200px; padding: 6px; display: grid; gap: 2px; background: var(--raised); border-radius: var(--radius-inner); }
+.menu button { height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: none; text-align: left; cursor: pointer; }
+.menu button:hover { background: var(--raised-hover); }
+.menu .danger { color: var(--negative); }
+
+.skipform { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 10px; }
+.skipform input { flex: 1; min-width: 0; height: var(--control-height); padding: 0 14px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--ground); }
+.skipform input::placeholder, textarea::placeholder { color: var(--faint); }
+
+/* The rail: requests for Claude. */
+.rail { background: var(--surface); border-radius: var(--radius-card); padding: var(--pad); display: grid; gap: var(--gap); }
+@media (min-width: 1000px) { .rail { position: sticky; top: 24px; } }
+@media (max-width: 999px) { .rail { margin-top: 32px; } }
+.rail h2 { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; }
+.rail h2 .num { color: var(--faint); font-weight: 400; }
+.rail p { margin: 0; color: var(--muted); }
+textarea { width: 100%; min-height: 76px; padding: 10px 14px; border: 1px solid var(--control); border-radius: var(--radius-inner); background: var(--ground); resize: vertical; line-height: 20px; }
+textarea:hover { border-color: var(--control-hover); }
+.compose { display: flex; justify-content: flex-end; }
+#queue { list-style: none; margin: 0; padding: 0; }
+.q { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--raised); }
+.q p { flex: 1; min-width: 0; margin: 0; color: var(--text); overflow-wrap: anywhere; }
+#rail-send { width: 100%; }
+
+/* The dock carries the last message and, without the rail beside the list, the Send button. */
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); }
+.dock .in { max-width: 1152px; margin: 0 auto; padding: 10px 24px; min-height: 56px; display: flex; align-items: center; gap: 12px; }
+#status { margin: 0; flex: 1; min-width: 0; color: var(--muted); text-wrap: pretty; }
+#status.err { color: var(--negative); }
+@media (min-width: 1000px) { #dock-send { display: none; } }
+
+@media (max-width: 640px) {
+  .top .in, .page, .dock .in { padding-left: 16px; padding-right: 16px; }
+  .page { padding-top: 20px; }
+  .scope { display: none; }
+  .tabs { grid-auto-flow: row; grid-template-columns: 1fr 1fr; }
+  .tab:last-child:nth-child(odd) { grid-column: 1 / -1; } /* an odd count ends on a full-width cell, never an orphan */
+  .tab { padding: 8px 12px 10px; }
+  .desc { -webkit-line-clamp: 2; }
+  .ident .aside { display: none; } /* the name earns the room; the full id stays in the tooltip */
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="in">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="2" y="3" width="18" height="4" rx="2" fill="#ff7d4d"/><rect x="2" y="9" width="12" height="4" rx="2" fill="#e6e6e6"/><rect x="2" y="15" width="7" height="4" rx="2" fill="#444444"/></svg>
+      <span>skillset</span><span class="scope" id="project"></span>
+    </div>
+    <input type="search" id="filter" placeholder="Filter" aria-label="Filter by name or description">
+  </div>
+</div>
+<div class="page">
+  <h1>Skill set</h1>
+  <p id="finding">Loading…</p>
+  <div class="layout">
+    <main>
+      <div class="loadout" id="loadout" aria-hidden="true"></div>
+      <div class="tabs" id="tabs" role="group" aria-label="Show"></div>
+      <div class="bar" id="toolbar"></div>
+      <ul class="rows" id="list"></ul>
+    </main>
+    <aside class="rail" aria-labelledby="rail-title">
+      <h2 id="rail-title">For Claude <span class="num" id="queue-n"></span></h2>
+      <p>Ask for research or a skill for a job. Requests from the row menus land here too.</p>
+      <textarea id="ask" maxlength="1000" placeholder="Find a skill for writing database migrations" aria-label="Request for Claude"></textarea>
+      <div class="compose"><button class="btn" id="ask-add">Add to queue</button></div>
+      <ul id="queue"></ul>
+      <button class="btn primary" id="rail-send" hidden>Send to Claude</button>
+    </aside>
+  </div>
+</div>
+<div class="dock" id="dock" hidden>
+  <div class="in">
+    <p id="status" role="status" aria-live="polite"></p>
+    <button class="btn primary" id="dock-send" hidden>Send to Claude</button>
+  </div>
+</div>
+<script type="application/json" id="cfg">{{CONFIG}}</script>
+<script nonce="{{NONCE}}">
+const CFG = JSON.parse(document.getElementById('cfg').textContent);
+const TIERS = [['essential', 'Essential'], ['useful', 'Useful'], ['informative', 'Informative']];
+const ABOUT = {
+  untiered: ['Installed since SKILLSET.md was written. Pick a tier for each.', 'Everything installed has a tier.'],
+  essential: ['Loads in every session.', 'Nothing loads in every session here.'],
+  useful: ['Named in the session digest; Claude pulls one in when a task needs it.', 'Nothing is on call here yet.'],
+  informative: ['Installed on this machine, switched off in this project.', 'Nothing is switched off here.'],
+  updates: ['Newer upstream than what is installed. An update applies to every project on this account.', 'Everything is up to date.'],
+};
+const ASK = { update: 'Review the update of', uninstall: 'Uninstall', similar: 'Find alternatives to', research: 'Research:' };
+const $ = (id) => document.getElementById(id);
+let state = null;
+let tab = 'essential';
+let stopped = false;
+let checking = false;
+let allUpdates = false;
+let note = '';
+let noteErr = false;
+let noteTimer = 0;
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+// Every value goes in as text, never as HTML.
+function el(tag, props = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'class') n.className = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined && v !== false) n.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) n.append(k instanceof Node ? k : String(k));
+  return n;
+}
+const ICONS = { more: ['M4 8h.01', 'M8 8h.01', 'M12 8h.01'], close: ['M4.5 4.5l7 7', 'M11.5 4.5l-7 7'] };
+function icon(name) {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  for (const [k, v] of Object.entries({ class: 'i', viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', 'stroke-width': name === 'more' ? '2.4' : '1.5', 'stroke-linecap': 'round', 'aria-hidden': 'true' })) s.setAttribute(k, v);
+  for (const d of ICONS[name]) { const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', d); s.append(p); }
+  return s;
+}
+
+function dock() {
+  const n = state?.queue?.length || 0;
+  const text = note || (n ? `${plural(n, 'request')} queued for Claude.` : '');
+  $('status').textContent = text;
+  $('status').className = noteErr ? 'err' : '';
+  for (const id of ['dock-send', 'rail-send']) { $(id).hidden = stopped || !n; $(id).textContent = `Send ${n} to Claude`; }
+  $('dock').hidden = !text && !n;
+}
+function say(msg, err = false) {
+  note = msg; noteErr = err;
+  clearTimeout(noteTimer);
+  if (!err && !stopped) noteTimer = setTimeout(() => { note = ''; dock(); }, 6000);
+  dock();
+}
+function stop(msg, err = true) {
+  stopped = true;
+  clearTimeout(noteTimer);
+  note = msg; noteErr = err;
+  document.querySelectorAll('button, input, textarea, select').forEach((b) => { b.disabled = true; });
+  dock();
+}
+
+async function api(path, body) {
+  if (stopped) throw new Error('stopped');
+  const opts = { headers: { 'x-skillset-token': CFG.token } };
+  if (body !== undefined) Object.assign(opts, { method: 'POST', body: JSON.stringify(body), headers: { ...opts.headers, 'content-type': 'application/json' } });
+  let res;
+  try { res = await fetch(path, opts); } catch { stop('This page has stopped. Run /skillset-status to open it again.'); throw new Error('stopped'); }
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+  return j;
+}
+const run = (fn) => async (...a) => {
+  try { await fn(...a); } catch (e) { if (e.message !== 'stopped') { say(e.message, true); if (state) render(); } }
+};
+
+// `anthropic-skills:skill-creator` → grey prefix, name; `agents-team@agents-team` → name, grey marketplace.
+function ident(name) {
+  const colon = name.lastIndexOf(':');
+  const at = name.lastIndexOf('@');
+  const end = at > colon ? at : name.length;
+  return el('span', { class: 'ident', title: name }, colon >= 0 ? el('span', { class: 'aside' }, name.slice(0, colon + 1)) : null, el('b', {}, name.slice(colon + 1, end)), end < name.length ? el('span', { class: 'aside' }, name.slice(end)) : null);
+}
+const matches = (q, ...parts) => !q || parts.join(' ').toLowerCase().includes(q);
+const query = () => $('filter').value.trim().toLowerCase();
+
+function row(item, tier) {
+  const self = item.id.startsWith('plugin:skillset@'); // the plugin never switches itself off
+  const fixed = item.kind === 'hook' ? 'A hook follows its plugin or settings file' : self ? 'skillset never switches itself off' : '';
+  const select = fixed
+    ? el('span', { class: 'fixed', title: fixed }, item.kind === 'hook' ? 'Always runs' : 'Always on')
+    : el('select', { 'aria-label': `Tier for ${item.id}` },
+      tier ? null : el('option', { value: '', selected: true, disabled: true }, 'Pick a tier'),
+      TIERS.map(([t, label]) => el('option', { value: t, selected: t === tier }, label)));
+  if (!fixed) select.addEventListener('change', () => move(item.id, select.value, select));
+  const extra = [];
+  if (!self && (item.kind === 'skill' || item.kind === 'plugin')) extra.push(el('button', { onclick: () => enqueue({ kind: 'similar', id: item.id }) }, 'Find alternatives'));
+  if (!self && item.installed && ['skill', 'plugin', 'mcp'].includes(item.kind)) extra.push(el('button', { class: 'danger', onclick: () => enqueue({ kind: 'uninstall', id: item.id }) }, 'Uninstall…'));
+  const more = extra.length
+    ? el('details', { class: 'more' }, el('summary', { 'aria-label': `More actions for ${item.id}`, title: 'More actions' }, icon('more')), el('div', { class: 'menu' }, extra))
+    : el('span', { class: 'slot' });
+  return el('li', { class: 'row' },
+    el('div', { class: 'id' }, ident(item.name), el('span', { class: 'tag' }, item.kind === 'builtin' ? 'built-in' : item.kind), item.installed ? null : el('span', { class: 'tag missing' }, 'not installed')),
+    item.text ? el('p', { class: 'desc', title: item.text }, item.text) : null,
+    el('div', { class: 'ctl' }, select, more));
+}
+
+function updateRow(u) {
+  const i = u.id.indexOf(':');
+  const reason = el('input', { type: 'text', placeholder: 'Why skip it? (optional)', maxlength: '300', 'aria-label': `Reason to skip ${u.id}` });
+  const form = el('div', { class: 'skipform', hidden: true }, reason,
+    el('button', { class: 'btn', onclick: () => skipIt(u.id, reason.value) }, 'Skip this version'),
+    el('button', { class: 'icon', 'aria-label': 'Cancel', title: 'Cancel', onclick: () => { form.hidden = true; } }, icon('close')));
+  return el('li', { class: 'row' },
+    el('div', { class: 'id' }, ident(u.id.slice(i + 1)), el('span', { class: 'tag' }, u.id.slice(0, i))),
+    el('p', { class: 'desc ver', title: u.how }, `${u.installed} → ${u.latest}`),
+    el('div', { class: 'ctl' },
+      el('button', { class: 'btn', onclick: () => enqueue({ kind: 'update', id: u.id }) }, 'Review'),
+      el('button', { class: 'btn', onclick: () => { form.hidden = false; reason.focus(); } }, 'Skip…')),
+    form);
+}
+
+// What each tab lists, after the filter. Updates for what this project uses come first.
+function lists(q) {
+  const rank = new Map(TIERS.flatMap(([t], i) => (state.tiers[t] || []).map((x) => [x.id, i])));
+  const byTier = Object.fromEntries(TIERS.map(([t]) => [t, (state.tiers[t] || []).filter((i) => matches(q, i.id, i.text))]));
+  return {
+    untiered: (state.untiered || []).filter((i) => matches(q, i.id, i.text)),
+    ...byTier,
+    updates: [...(state.updates || [])].sort((a, b) => (rank.get(a.id) ?? 3) - (rank.get(b.id) ?? 3)).filter((u) => matches(q, u.id)),
+  };
+}
+
+function render() {
+  const q = query();
+  const L = lists(q);
+  const all = lists('');
+  const parts = state.project.split('/');
+  $('project').textContent = parts[parts.length - 1];
+  $('project').title = state.project;
+  if (!all.untiered.length && tab === 'untiered') tab = 'essential';
+
+  // The finding: what this project loads out of what is installed, and what needs attention.
+  const [e, u, i] = TIERS.map(([t]) => all[t].length);
+  const total = e + u + i + all.untiered.length;
+  const used = all.updates.filter((x) => (state.tiers.essential || []).concat(state.tiers.useful || []).some((y) => y.id === x.id)).length;
+  $('finding').textContent = [
+    all.untiered.length ? `${plural(all.untiered.length, 'installed thing has', 'installed things have')} no tier yet.` : '',
+    `${e} of the ${total} listed load in every session, ${u} ${u === 1 ? 'is' : 'are'} on call and ${i} stay off here.`,
+    used ? `${plural(used, 'update touches', 'updates touch')} what this project uses.` : '',
+  ].filter(Boolean).join(' ');
+
+  const segs = [['untiered', all.untiered.length], ['essential', e], ['useful', u], ['informative', i]].filter(([, n]) => n);
+  $('loadout').replaceChildren(...segs.map(([t, n]) => { const s = el('span', { class: `t-${t}` }); s.style.flexGrow = String(n); return s; }));
+
+  const cells = [...(all.untiered.length ? [['untiered', 'Not tiered']] : []), ...TIERS, ['updates', 'Updates']];
+  $('tabs').replaceChildren(...cells.map(([t, label]) => el('button', { class: 'tab', 'aria-pressed': String(t === tab), onclick: () => { tab = t; allUpdates = false; render(); } },
+    el('span', { class: 'lab' }, t === 'updates' ? null : el('span', { class: `dot t-${t}` }), label),
+    el('span', { class: 'val' }, String(L[t].length)))));
+
+  const items = L[tab];
+  const stamp = tab === 'updates' && state.checkedAt ? el('span', { class: 'stamp num' }, `Checked ${new Date(state.checkedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`) : null;
+  const check = tab === 'updates' ? el('button', { class: 'btn', disabled: checking || stopped, onclick: checkNow }, checking ? 'Checking…' : 'Check now') : null;
+  $('toolbar').replaceChildren(...[el('p', {}, q ? `${plural(items.length, 'match', 'matches')} for “${$('filter').value.trim()}”.` : ABOUT[tab][0]), stamp, check].filter(Boolean));
+
+  let rows;
+  if (!items.length) rows = [el('li', {}, el('p', { class: 'empty' }, q ? 'Nothing here matches the filter.' : tab === 'updates' && !state.checkedAt ? 'No check has run yet.' : ABOUT[tab][1]))];
+  else if (tab === 'updates') {
+    const shown = allUpdates || q ? items : items.slice(0, 8);
+    rows = shown.map(updateRow);
+    if (shown.length < items.length) rows.push(el('li', { class: 'more-rows' }, el('button', { class: 'btn', onclick: () => { allUpdates = true; render(); } }, `Show ${items.length - shown.length} more`)));
+  } else rows = items.map((x) => row(x, tab === 'untiered' ? null : tab));
+  $('list').replaceChildren(...rows);
+
+  const queue = state.queue || [];
+  $('queue-n').textContent = queue.length ? String(queue.length) : '';
+  $('queue').replaceChildren(...queue.map((it, n) => el('li', { class: 'q' },
+    el('p', {}, [ASK[it.kind], it.id, it.text].filter(Boolean).join(' ')),
+    el('button', { class: 'icon', 'aria-label': 'Remove from the queue', title: 'Remove', onclick: () => unqueue(n) }, icon('close')))));
+  if (stopped) document.querySelectorAll('button, input, textarea, select').forEach((b) => { b.disabled = true; });
+  dock();
+}
+
+const load = run(async () => { state = await api('/api/state'); if (state.untiered?.length && tab === 'essential' && !load.done) tab = 'untiered'; load.done = true; render(); });
+const move = run(async (id, tier, control) => {
+  control.disabled = true;
+  const r = await api('/api/move', { ids: [id], tier });
+  state = r.state;
+  render();
+  if (r.error) return say(`Not applied: ${r.error}`, true);
+  say(`${id} is now ${tier}. ${r.reload ? 'Plugins change after /reload-plugins or in a new session.' : 'Skills follow at once.'}${r.unenforced.includes(id) ? ' This kind has no per-project switch, so the tier is a note for Claude.' : ''}`);
+});
+const enqueue = run(async (item) => {
+  document.querySelectorAll('details.more[open]').forEach((d) => { d.open = false; });
+  const r = await api('/api/queue', item);
+  state.queue = r.queue;
+  render();
+  say('Queued for Claude. Send the queue when you are ready.');
+});
+const unqueue = run(async (index) => { const r = await api('/api/unqueue', { index }); state.queue = r.queue; render(); });
+const skipIt = run(async (id, reason) => { const r = await api('/api/skip', { id, reason }); state = r.state; render(); say(`Skipped this version of ${id}. A newer one will be proposed again.`); });
+const checkNow = run(async () => {
+  checking = true; render(); say('Checking upstream. This takes about ten seconds.');
+  try { const r = await api('/api/check', {}); state = r.state; } finally { checking = false; }
+  render();
+  say(state.updates.length ? `${plural(state.updates.length, 'update')} pending.` : 'Everything is up to date.');
+});
+const send = run(async () => { const r = await api('/api/send', {}); stop(`Sent ${plural(r.count, 'request')} to Claude. You can close this tab.`, false); });
+const addAsk = () => { const text = $('ask').value.trim(); if (!text) return; enqueue({ kind: 'research', text }); $('ask').value = ''; };
+
+$('ask-add').addEventListener('click', addAsk);
+$('ask').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addAsk(); });
+$('dock-send').addEventListener('click', send);
+$('rail-send').addEventListener('click', send);
+$('filter').addEventListener('input', () => { if (state) render(); });
+document.addEventListener('click', (e) => { const keep = e.target.closest?.('details.more'); document.querySelectorAll('details.more[open]').forEach((d) => { if (d !== keep) d.open = false; }); });
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const open = document.querySelector('details.more[open]');
+  if (open) { open.open = false; open.querySelector('summary').focus(); }
+});
+window.addEventListener('focus', () => { if (!stopped && !checking) load(); });
+load();
+</script>
+</body>
+</html>

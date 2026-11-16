@@ -24,6 +24,15 @@ export const due = (state, now = Date.now()) => !(now - (Date.parse(state.checkS
 // Pending: found by the last check and not skipped at that same version.
 export const pending = (state) => (state.updates || []).filter((u) => state.skipped?.[u.id]?.latest !== u.latest);
 
+// Stops proposing the pending update of `id` until a version newer than this one appears.
+export function skip(p, id, reason = '') {
+  const st = readState(p);
+  const u = (st.updates || []).find((x) => x.id === id);
+  if (!u) throw new Error(`no pending update for ${id}. Run \`check --cached\` for the list.`);
+  writeState(p, { ...st, skipped: { ...st.skipped, [id]: { latest: u.latest, reason, at: new Date().toISOString().slice(0, 10) } } });
+  return u;
+}
+
 // True when `a` is a higher dotted version than `b`. Commit-hash versions are not compared.
 // shortcut: pre-release tags are ignored (1.2.0-beta reads as 1.2.0); compare them if a plugin ships them.
 export function newer(a, b) {

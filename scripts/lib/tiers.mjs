@@ -98,6 +98,23 @@ export function setTier(text, id, tier, newLine) {
   return lines.join(eol);
 }
 
+// Moves ids to a tier ('none' drops their lines) and applies the result. The CLI and the status page both
+// come through here. Every id is checked before the file is written, so a bad id changes nothing.
+export function moveItems(projectDir, tier, ids, things) {
+  if (![...TIERS, 'none'].includes(tier) || !ids.length) throw new Error('usage: move <essential|useful|informative|none> <id> [<id>...]');
+  const file = path.join(projectDir, FILE);
+  let text = fs.readFileSync(file, 'utf8');
+  const have = new Set(parse(text).items.map((i) => i.id));
+  for (const id of ids) {
+    if (split(id)[0] === 'hook' && tier !== 'none') throw new Error(`${id}: a hook has no switch of its own; it follows its plugin or settings file.`);
+    const t = things.find((x) => x.id === id);
+    if (!have.has(id) && !t && tier !== 'none' && !/^(builtin|connector):./.test(id)) throw new Error(`${id} is not installed and has no line in ${FILE}. Run \`inventory\` for the ids.`);
+    text = setTier(text, id, tier, itemLine(t || { id }, tier));
+  }
+  fs.writeFileSync(file, text);
+  return apply(projectDir, parse(text).items, tier === 'none' ? ids : []);
+}
+
 // The settings each tier turns into. Only switches the docs describe are written here.
 export function desired(items, projectMcp = new Set()) {
   const d = { skillOverrides: {}, enabledPlugins: {}, mcpOff: [], mcpOn: [], unenforced: [] };
@@ -177,7 +194,7 @@ export function reconcile(items, things) {
   };
 }
 
-const lead = (text) => text.split(/ · (?:Source|Use|Config):/)[0].trim();
+export const lead = (text) => text.split(/ · (?:Source|Use|Config):/)[0].trim();
 const sentence = (s) => (/[.!?…]$/.test(s) ? s : `${s}.`);
 const names = (ids, max = 8) => ids.slice(0, max).map((i) => `\`${i}\``).join(', ') + (ids.length > max ? ` and ${ids.length - max} more` : '');
 

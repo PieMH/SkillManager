@@ -3,10 +3,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { inventory, oneLine, paths } from './lib/inventory.mjs';
-import { FILE, TIERABLE, TIERS, apply, digest, itemLine, parse, reconcile, render, setTier, split, summarize } from './lib/tiers.mjs';
+import { FILE, TIERABLE, TIERS, apply, digest, moveItems, parse, reconcile, render, summarize } from './lib/tiers.mjs';
 import { dismiss } from './lib/session.mjs';
-import { check, pending, readState, writeState } from './lib/updates.mjs';
+import { check, pending, readState, skip, writeState } from './lib/updates.mjs';
 import { report, scan } from './lib/scan.mjs';
+import { startServer } from './lib/serve.mjs';
 
 const USAGE = `usage: skillset <command> [--project <dir>] [--json]
   inventory                       everything installed for this profile and project
@@ -18,6 +19,7 @@ const USAGE = `usage: skillset <command> [--project <dir>] [--json]
   check [--cached]                which plugins and skills have updates upstream (--cached: the last result, no network)
   skip <id> [--reason text]       stop proposing the pending update of <id> until a newer one appears
   scan <path> [--no-external]     facts about a plugin or skill folder before installing it
+  serve                           the status page on 127.0.0.1; prints its link, then the queue for Claude on exit
   dismiss                         stop offering configuration in this project`;
 
 const argv = process.argv.slice(2);
@@ -91,18 +93,9 @@ switch (cmd) {
   }
   case 'move': {
     const [tier, ...ids] = rest;
-    if (![...TIERS, 'none'].includes(tier) || !ids.length) fail('usage: move <essential|useful|informative|none> <id> [<id>...]');
-    let text = readFile();
-    const { things } = inventory({ projectDir });
-    const have = new Set(parse(text).items.map((i) => i.id));
-    for (const id of ids) {
-      if (split(id)[0] === 'hook' && tier !== 'none') fail(`${id}: a hook has no switch of its own; it follows its plugin or settings file.`);
-      const t = things.find((x) => x.id === id);
-      if (!have.has(id) && !t && tier !== 'none' && !/^(builtin|connector):./.test(id)) fail(`${id} is not installed and has no line in ${FILE}. Run \`inventory\` for the ids.`);
-      text = setTier(text, id, tier, itemLine(t || { id }, tier));
-    }
-    fs.writeFileSync(file, text);
-    const res = apply(projectDir, parse(text).items, tier === 'none' ? ids : []);
+    readFile(); // a clear message when there is no SKILLSET.md
+    let res;
+    try { res = moveItems(projectDir, tier, ids, inventory({ projectDir }).things); } catch (err) { fail(err.message); }
     print({ moved: ids, tier, ...res }, `${tier === 'none' ? 'Dropped' : `Moved to ${tier}`}: ${ids.join(', ')}\n${applied(res)}`);
     break;
   }
@@ -136,7 +129,9 @@ switch (cmd) {
     const st = readState(p);
     const list = pending(st);
     if (flags.quiet) break;
-    const out = [st.checkedAt ? `Last check ${st.checkedAt.slice(0, 16).replace('T', ' ')}: ${list.length} update(s) pending.` : 'No update check has run yet. Run `check` without --cached.'];
+    const when = (iso) => new Date(iso).toLocaleString();
+    const out = [`Profile ${p.configDir.replace(/\\/g, '/')}.`, st.checkedAt ? `Last check ${when(st.checkedAt)}: ${list.length} update(s) pending.` : 'No update check has run yet. Run `check` without --cached.'];
+    if (st.checkStartedAt) out.push(`The next background check starts with the first session after ${when(Date.parse(st.checkStartedAt) + 7 * 24 * 3600 * 1000)}.`);
     for (const u of list) out.push(`- ${u.id}: ${u.installed} → ${u.latest}  (${u.how})`);
     const skipped = Object.entries(st.skipped || {});
     if (skipped.length) out.push(`Skipped: ${skipped.map(([id, s]) => `${id} ${s.latest}${s.reason ? ` (${s.reason})` : ''}`).join(', ')}`);
@@ -145,13 +140,9 @@ switch (cmd) {
     break;
   }
   case 'skip': {
-    const [id] = rest;
-    const p = paths();
-    const st = readState(p);
-    const u = (st.updates || []).find((x) => x.id === id);
-    if (!u) fail(`no pending update for ${id}. Run \`check --cached\` for the list.`);
-    writeState(p, { ...st, skipped: { ...st.skipped, [id]: { latest: u.latest, reason: typeof flags.reason === 'string' ? flags.reason : '', at: new Date().toISOString().slice(0, 10) } } });
-    console.log(`Skipped ${id} ${u.latest}. A newer version will be proposed again.`);
+    let u;
+    try { u = skip(paths(), rest[0], typeof flags.reason === 'string' ? flags.reason : ''); } catch (err) { fail(err.message); }
+    console.log(`Skipped ${rest[0]} ${u.latest}. A newer version will be proposed again.`);
     break;
   }
   case 'scan': {
@@ -160,6 +151,13 @@ switch (cmd) {
     try { r = scan(rest[0], { things: inventory({ projectDir }).things, external: !flags['no-external'] }); } catch (err) { fail(err.message); }
     print(r, report(r));
     break;
+  }
+  case 'serve': {
+    readFile(); // the page shows SKILLSET.md, so it needs one
+    // Synchronous writes: the output goes to a file that Claude reads, and process.exit follows at once.
+    const s = await startServer({ projectDir, onExit: (r) => { fs.writeSync(1, `skillset-queue: ${JSON.stringify(r)}\n`); process.exit(0); } });
+    fs.writeSync(1, `skillset-status: ready ${s.url}\n`);
+    break; // the server keeps the process alive until Send to Claude or 30 idle minutes
   }
   case 'dismiss':
     dismiss(projectDir);

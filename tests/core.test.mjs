@@ -293,5 +293,67 @@ assert.equal(cli('skip', 'plugin:tool@mkt', '--reason', 'pinned').status, 0);
 assert.equal(pending(readState(p)).length, 2);
 assert.equal(cli('skip', 'plugin:nope').status, 1);
 
+// --- status page server --------------------------------------------------------------------------
+const http = await import('node:http');
+const { startServer } = await import('../scripts/lib/serve.mjs');
+let exited = null;
+const page = await startServer({ projectDir: project, env, home, io, onExit: (r) => { exited = r; } });
+const call = (method, route, { headers = {}, body } = {}) => new Promise((resolve, reject) => {
+  const data = body === undefined ? null : typeof body === 'string' ? body : JSON.stringify(body);
+  const rq = http.request({ host: '127.0.0.1', port: page.port, method, path: route, headers: { host: `127.0.0.1:${page.port}`, ...headers, ...(data ? { 'content-length': Buffer.byteLength(data) } : {}) } }, (rs) => {
+    let s = '';
+    rs.on('data', (c) => { s += c; });
+    rs.on('end', () => { let j = null; try { j = JSON.parse(s); } catch { /* html or text */ } resolve({ status: rs.statusCode, headers: rs.headers, text: s, json: j }); });
+  });
+  rq.on('error', reject);
+  if (data) rq.write(data);
+  rq.end();
+});
+const auth = { 'x-skillset-token': page.token };
+const post = (route, body, headers = {}) => call('POST', route, { body, headers: { ...auth, 'content-type': 'application/json', ...headers } });
+
+assert.match(page.url, /^http:\/\/127\.0\.0\.1:\d+\/\?t=[0-9a-f]{48}$/);
+assert.equal((await call('GET', '/')).status, 403, 'the page needs the launch token');
+let got = await call('GET', `/?t=${page.token}`);
+assert.equal(got.status, 200);
+assert.ok(!got.text.includes('{{') && got.text.includes(page.token), 'placeholders are filled');
+const nonce = /'nonce-([^']+)'/.exec(got.headers['content-security-policy'])?.[1];
+assert.ok(nonce && got.text.includes(`<script nonce="${nonce}">`), 'the inline script carries the CSP nonce');
+assert.match(got.headers['content-security-policy'], /default-src 'none'.*connect-src 'self'.*frame-ancestors 'none'/);
+assert.equal((await call('GET', '/api/state')).status, 403, 'the API needs the token header');
+assert.equal((await call('GET', '/api/state', { headers: { ...auth, host: `evil.example:${page.port}` } })).status, 403, 'DNS rebinding: an unknown Host is refused');
+assert.equal((await call('GET', '/api/state', { headers: { ...auth, origin: 'http://evil.example' } })).status, 403, 'cross-origin requests are refused');
+got = await call('GET', '/api/state', { headers: auth });
+assert.equal(got.status, 200);
+assert.ok(got.json.tiers.essential.some((i) => i.id === 'plugin:tool@mkt'));
+assert.equal(got.json.scope, 'A test project.');
+assert.equal((await call('POST', '/api/move', { headers: auth, body: '{"ids":["skill:gsap-core"],"tier":"useful"}' })).status, 415, 'JSON content type only');
+got = await post('/api/move', { ids: ['skill:gsap-core'], tier: 'useful' });
+assert.equal(got.status, 200, got.text);
+assert.equal(parse(fs.readFileSync(path.join(project, 'SKILLSET.md'), 'utf8')).items.find((i) => i.id === 'skill:gsap-core').tier, 'useful');
+assert.equal(JSON.parse(fs.readFileSync(local, 'utf8')).skillOverrides['gsap-core'], 'name-only', 'a move from the page is applied');
+assert.ok(got.json.state.tiers.useful.some((i) => i.id === 'skill:gsap-core'));
+got = await post('/api/move', { ids: ['hook:user/PreToolUse/Bash'], tier: 'useful' });
+assert.deepEqual([got.status, /hook has no switch/.test(got.json.error)], [400, true]);
+assert.equal((await post('/api/move', { ids: ['skill:gsap-core'], tier: 'none' })).status, 400, 'the page cannot drop lines');
+assert.equal((await post('/api/queue', { kind: 'research' })).status, 400);
+assert.equal((await post('/api/queue', { kind: 'rm -rf', id: 'x' })).status, 400, 'only known request kinds are queued');
+await post('/api/queue', { kind: 'update', id: 'plugin:tool@mkt' });
+await post('/api/queue', { kind: 'research', text: 'a skill for SQL migrations' });
+got = await post('/api/unqueue', { index: 0 });
+assert.deepEqual(got.json.queue, [{ kind: 'research', id: null, text: 'a skill for SQL migrations' }]);
+got = await post('/api/check', {});
+assert.deepEqual(got.json.state.updates.map((u) => u.id).sort(), ['plugin:local@dirmkt', 'skill:humanizer']);
+got = await post('/api/skip', { id: 'plugin:local@dirmkt', reason: 'later' });
+assert.deepEqual(got.json.state.updates.map((u) => u.id), ['skill:humanizer']);
+assert.equal(readState(p).skipped['plugin:local@dirmkt'].reason, 'later');
+got = await post('/api/send', {});
+assert.deepEqual(got.json, { ok: true, count: 1 });
+await new Promise((r) => setTimeout(r, 50));
+assert.deepEqual(exited, { reason: 'sent', queue: [{ kind: 'research', id: null, text: 'a skill for SQL migrations' }] });
+await assert.rejects(call('GET', '/api/state', { headers: auth }), 'the server stops after sending');
+const idle = await new Promise((resolve) => { startServer({ projectDir: project, env, home, idleMs: 40, onExit: resolve }); });
+assert.deepEqual(idle, { reason: 'idle', queue: [] }, 'an unused page stops by itself');
+
 fs.rmSync(root, { recursive: true, force: true });
 console.log('core.test.mjs: all checks passed');
