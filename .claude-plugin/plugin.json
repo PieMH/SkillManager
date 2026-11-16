@@ -1,0 +1,10 @@
+{
+  "name": "skillset",
+  "version": "0.1.0",
+  "description": "Per-project tiers for skills, plugins, MCP servers and agents: essential loads every session, useful is pulled in on demand, informative stays off. Applied at session start through Claude Code's own settings.",
+  "author": {
+    "name": "PieMH"
+  },
+  "license": "MIT",
+  "keywords": ["skills", "plugins", "mcp", "context", "token-efficiency", "configuration"]
+}

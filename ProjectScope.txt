@@ -1,0 +1,39 @@
+I have a need and an idea for a Claude code plugin that is comprised of several skills and hooks
+Every Claude account I have and project needs this: a smart on-demand skill loader, configurator and udpdater
+It's something that can structure a project root SKILL.md file that is comprised of 3 pieces:
+essential: that contains all skills, plugins, connectors to use in this specific project, that are needed to be loaded in every session
+useful: contains the list of all things that the agent might connect and use and include in this project on demand depending on the specific task it's working on, but that they are not needed to be included always
+informative: contains all things installed on this machine or on this Claude accounts that the agent must be aware of that there are available if ever the project scope might need them to be integrated, they are usually things far outside the scope of this project that are rarely needed here
+all things (hooks, skills, connectors, plugins, agents, mcp) have their source link, a brief description of what they do, how to use them, how to configure in the project.
+So this whole sub project is actually a mega hook that depending on the user prompt loads and unloads "things" needed on this exact Claude session, or project, or task
+moreover this "hook" or plugin should also have an auto update and auto configure skill to weekly (scheduled task per account) search online each "thing" and see if it needs to be updated, if the update conflicts with the user project scope or conflicts with the user stack we flag the update as not needed and move on
+
+When the user creates a new project it's boot hook starts and asks the user the scope of the project and based on the user reply auto configures that SKILL.md file and drafts a CLAUDE.md with /init (if you can auto send a Claude command, if not then you do CLAUDE.md composition yourself writing the scope of the project and to point to SKILL.md to let agents know what to work with
+this works also with a /configureThisProjectSkills command by the user
+for projects already started, mid sessions you can always boot with the /configureThisProjectSkills and if Claude.md already speaks of a skill.md read it and make it compliant with this plugin, if not create what's missing and be sure to edit Claude.md to point to the new SKILL.md file, search for already installed and loaded skills/plugins/hooks/mcp/connectors and report the user the current stack vs your proposed category configuration, understand what the user wants to change or update and do it
+
+but the real strength is the auto hook on every first prompt of any session for that same project where the auto hooks understand what to load and unload in the context from the skill set
+then this skill should also be paired with a scheduled task to auto updates things globally for the user (can we configure this automatically or do we need the user to create a scheduler for this? or there is a better way to do this automatically?)
+the auto scheduler should also run to search online on google, on GitHub and on https://skillsllm.com/ if new skills are worth installing or including for the user projects in this account/computer
+
+another very important thing this hook/skill/plugin must do is to check on skills conflicts where different skills do the same thing slightly different, they interact or hook with things that break other things, need an external API key to function, need prerequisites we don't have, have important security issues
+so for every "thing" the user wants to install do this compliance check and report the user the problems if there are, how do you propose to solve them and ask the user how he wants to solve them, for few inconsistencies and conflicts you should solve them automatically by default, for important matters just propose a solution and report to the user
+
+
+also it contains the command /updateSkillSet that the user can invoke anytime to change and update the skill set on demand by asking Claude what's the currect status, if we want to change the skill.md configuration to move some skills up or down the categories or install/include new ones, this command should also be a hook whenever the user plainly tells to install or configure something new, or whenever the user themselves remove something from the list and they uninstall it (I don't know if we can hook to know if the user removes something manually, if we don't then on the weekly scheduler we can do a full list check of things installed, same as on a new session boot)
+
+and the command /SkillSetStatus to just print on console or better yet show the user a simple html artifact with the categories of each skill installed, the plugins the connectors the hooks, and the availability on that same self served html page to serve some buttons to:
+1. move some skill up and down the categories - Claude then resets the skill.md and loads/unloads what changed
+2. request an update check on the skill
+3. request a search online for a similar skill
+4. research a request online for something the user types in a search bar
+5. configure the schedulers
+6. delete uninstall something
+
+this should work on both Claude desktop app and in CCWrapper natively, similar to what ponytail does that hooks to the user command line and works everywhere (search online for ponytail, Claude desktop, CCWrapper is a project we made ourselves to wrap the Claude ps shell cli with a custom mdae desktop app that resembles a lightweight Claude desktop app)
+
+suggestions? problems? improvements?
+
+of course this is going to be a public repo on GitHub so anyone can use this plugin for Claude code
+
+

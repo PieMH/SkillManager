@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "skillset",
+  "description": "Per-project tiers for the skills, plugins, MCP servers and agents Claude Code loads.",
+  "owner": {
+    "name": "PieMH"
+  },
+  "plugins": [
+    {
+      "name": "skillset",
+      "description": "Per-project tiers for skills, plugins, MCP servers and agents: essential loads every session, useful is pulled in on demand, informative stays off.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}
