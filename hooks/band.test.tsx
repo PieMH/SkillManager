@@ -16,7 +16,8 @@ const band = (surface: (typeof SURFACES)[number]) => ({
 type World = { tiered: boolean; state?: object; ran: string[] }
 // The engine normalises a path before a hook sees it, so match on its end.
 const ends = (path: string, tail: string) => path.replace(/\\/g, '/').toLowerCase().endsWith(tail)
-function engine(on: Parameters<Parameters<typeof test>[1]>[1], w: World) {
+type On = Parameters<Extract<Parameters<typeof test>[1], (...args: never[]) => unknown>>[1] // the body overload, not the options one
+function engine(on: On, w: World) {
   on('session.cwd', () => ({ value: 'C:\\Projects\\demo' }))
   on('env.get', (_, e) => ({ value: e.name === 'CLAUDE_CONFIG_DIR' ? 'C:\\cfg' : undefined }))
   on('clock.now', () => ({ value: NOW }))

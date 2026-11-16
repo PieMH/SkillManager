@@ -58,7 +58,7 @@ claude plugin install skillset@skillset
 ## Releasing
 
 1. Bump `version` in `.claude-plugin/plugin.json` (semver).
-2. Keep the tier table identical in `README.md` and `skills/skillset-configure/SKILL.md`.
+2. Keep what each tier does consistent across `docs/how-it-works.md`, `skills/skillset-configure/SKILL.md` and the README's three-line table. The README stays short; details go in `docs/how-it-works.md`.
 3. Users update with `claude plugin marketplace update skillset && claude plugin update skillset@skillset`.
 
 ## Style

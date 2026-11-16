@@ -4,10 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
 <title>Skill set</title>
 <style nonce="{{NONCE}}">
-/* True-black flat: elevation by lightness alone, colour only on data.
-   Grid: one centred column of at most 1152px. With the rail, 798 + 14 + 340 = 1152. */
+/* True-black flat: elevation by lightness alone, colour only on data and on the one action asking to be pressed.
+   One full-width column of at most 1152px: ask, then tiers, then the filter and the list. */
 :root {
   --ground: #000000; --surface: #111111; --hover: #1a1a1a; --raised: #2a2a2a; --raised-hover: #333333;
   --border: #1a1a1a; --rule: #161616; --control: #444444; --control-hover: #6b6b6b;
@@ -18,56 +19,93 @@
   --pill-neutral-bg: #222222; --pill-warning-bg: #2b2414; --pill-warning-ink: #e5a93b;
   --radius-card: 20px; --radius-inner: 14px; --radius-control: 999px;
   --gap: 14px; --pad: 22px; --control-height: 32px;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html { color-scheme: dark; -webkit-font-smoothing: antialiased; scrollbar-color: var(--raised) var(--ground); accent-color: var(--text); caret-color: var(--text); }
+html { color-scheme: dark; -webkit-font-smoothing: antialiased; scrollbar-color: var(--raised) var(--ground); accent-color: var(--text); caret-color: var(--text); scroll-padding-bottom: 80px; -webkit-tap-highlight-color: transparent; } /* the dock never hides a focused row */
+button, select, summary, input { touch-action: manipulation; }
 ::selection { background: #3a3a3a; color: var(--text); }
 body { margin: 0; background: var(--ground); color: var(--text); font: 14px/20px var(--font); }
 :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .num { font-variant-numeric: tabular-nums; }
 
-/* Shell: a 48px top bar on the ground, the product and its scope on the left, search on the right. */
+/* Shell: a 48px bar naming the product and the project. */
 .top { height: 48px; border-bottom: 1px solid var(--border); }
 .top .in, .page { max-width: 1152px; margin: 0 auto; padding: 0 24px; }
-.top .in { height: 100%; display: flex; align-items: center; gap: 16px; }
+.top .in { height: 100%; display: flex; align-items: center; }
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 600; white-space: nowrap; }
 .brand svg { flex: none; }
 .scope { color: var(--muted); font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
 .scope::before { content: "/"; color: var(--faint); margin-right: 10px; }
-#filter { margin-left: auto; width: 280px; min-width: 120px; flex: 0 1 280px; height: 32px; padding: 0 14px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--ground); color: var(--text); font: inherit; font-size: 13px; }
-#filter::placeholder { color: var(--faint); }
-#filter:hover { border-color: var(--control-hover); }
 
 .page { padding-top: 28px; padding-bottom: 112px; }
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--gap); align-items: start; }
-@media (max-width: 999px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+h1 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 0; text-wrap: balance; }
+#finding { margin: 4px 0 0; color: var(--muted); max-width: 72ch; text-wrap: pretty; }
 
-/* Title row: a noun, then the finding. */
-h1 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 0; }
-#finding { margin: 4px 0 0; color: var(--muted); max-width: 68ch; text-wrap: pretty; }
+/* Controls: pills. The primary is inverted (white, black label); the rest are outlined. */
+input, select, button { font: inherit; font-size: 13px; color: var(--text); }
+select { width: 128px; height: var(--control-height); padding: 0 10px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--ground); cursor: pointer; }
+.btn { height: var(--control-height); padding: 0 14px; border: 1px solid var(--control); border-radius: var(--radius-control); background: none; cursor: pointer; white-space: nowrap; transition: border-color .15s ease, background-color .15s ease, transform .16s var(--ease-out); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.primary { height: 36px; padding: 0 18px; border: 0; background: var(--text); color: var(--ground); font-weight: 600; }
+.icon { width: 32px; height: 32px; padding: 0; display: inline-grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--muted); cursor: pointer; flex: none; transition: background-color .15s ease, color .15s ease; }
+button:disabled, select:disabled, input:disabled { opacity: .45; cursor: default; }
+input[type=text], input[type=search] { height: var(--control-height); padding: 0 14px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--ground); }
+input::placeholder { color: var(--faint); }
+svg.i { width: 16px; height: 16px; display: block; }
+@media (hover: hover) and (pointer: fine) {
+  select:hover:not(:disabled), .btn:hover:not(:disabled), input:hover:not(:disabled) { border-color: var(--control-hover); }
+  .primary:hover:not(:disabled) { background: var(--muted); }
+  .icon:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+}
+
+/* The weekly update pass, once it is due: the one control on the page that asks to be pressed. */
+.pass { display: flex; align-items: center; gap: 16px; margin: 20px 0 0; padding: 14px 14px 14px 20px; border-radius: var(--radius-card); background: var(--surface); }
+.pass p { margin: 0; flex: 1; min-width: 0; color: var(--muted); text-wrap: pretty; }
+.pass p b { color: var(--text); font-weight: 600; }
+/* The glow is a layer under the button whose opacity pulses (compositor only): twice, then it holds. */
+.glow { position: relative; isolation: isolate; }
+.glow::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; box-shadow: 0 0 0 3px rgba(255, 125, 77, .32), 0 0 30px 8px rgba(255, 125, 77, .55); opacity: .7; animation: glow 2.4s ease-in-out 2; }
+@keyframes glow { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+.glow:disabled::after { opacity: 0; animation: none; }
+
+/* Ask Claude: the full-width bar on top. What is queued sits under it as chips; Send lives in the dock. */
+.ask { margin-top: 20px; padding: 6px; border-radius: var(--radius-card); background: var(--surface); }
+.ask form { display: flex; align-items: center; gap: 6px; margin: 0; }
+.ask label { flex: none; padding: 0 8px 0 14px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+.ask input { flex: 1; min-width: 0; height: 40px; border-color: transparent; }
+.ask .btn { height: 40px; padding: 0 18px; }
+#queue { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 6px 2px 2px; list-style: none; }
+#queue:empty { display: none; }
+.chip { display: flex; align-items: center; gap: 2px; max-width: 100%; height: 32px; padding: 0 2px 0 12px; border-radius: var(--radius-control); background: var(--raised); transition: opacity .15s var(--ease-out), transform .15s var(--ease-out); }
+@starting-style { .chip { opacity: 0; transform: scale(.96); } }
+.chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 56ch; }
+.chip .icon { width: 28px; height: 28px; }
 
 /* The loadout bar: how much of what is installed this project loads. Its segments are the tabs' dots. */
-.loadout { display: flex; gap: 2px; height: 6px; margin: 20px 0 var(--gap); }
+.loadout { display: flex; gap: 2px; height: 6px; margin: 28px 0 var(--gap); }
 .loadout span { border-radius: 999px; min-width: 6px; }
 .t-essential { background: var(--accent); } .t-useful { background: var(--tier-useful); } .t-informative { background: var(--tier-informative); } .t-untiered { background: var(--warning); }
 
 /* The tier counts are the list's tabs: one #111 container, the selected cell one step lighter. */
 .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 6px; background: var(--surface); border-radius: var(--radius-card); }
-.tab { display: grid; gap: 2px; justify-items: start; padding: 10px 14px 12px; border: 0; border-radius: var(--radius-inner); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: background-color .15s; }
-.tab:hover { background: var(--hover); }
+.tab { display: grid; gap: 2px; justify-items: start; padding: 10px 14px 12px; border: 0; border-radius: var(--radius-inner); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: background-color .15s ease; }
 .tab[aria-pressed="true"] { background: var(--raised); }
+@media (hover: hover) and (pointer: fine) { .tab:hover:not([aria-pressed="true"]) { background: var(--hover); } }
 .tab .lab { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .tab[aria-pressed="true"] .lab { color: var(--text); }
 .tab .val { font-size: 24px; line-height: 32px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .tab[aria-pressed="true"] .val { font-weight: 500; }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 
-/* Toolbar between the tabs and the list. */
-.bar { display: flex; align-items: center; gap: 12px; min-height: 36px; margin: 22px 0 6px; }
-.bar p { margin: 0; flex: 1; min-width: 0; color: var(--muted); }
+/* Under the tabs: the filter, what this tab holds, and the tab's own action. */
+.bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-height: 36px; margin: 18px 0 6px; }
+#filter { width: 280px; }
+#toolbar { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 240px; }
+#toolbar p { margin: 0; flex: 1; min-width: 0; color: var(--muted); }
 .stamp { color: var(--faint); font-size: 12px; white-space: nowrap; }
 
 /* Rows sit on the ground, split by faint rules. */
@@ -85,91 +123,55 @@ ul.rows { list-style: none; margin: 0; padding: 0; }
 .slot { width: 32px; flex: none; }
 .empty { margin: 0; padding: 14px 16px; border-radius: var(--radius-inner); background: var(--surface); color: var(--muted); }
 .more-rows { padding: 14px 0 0; }
+.skipform { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 10px; }
+.skipform input { flex: 1; min-width: 0; }
 
-/* The weekly update pass, once it is due: the one control on the page that asks to be pressed. */
-.pass { display: flex; align-items: center; gap: 16px; margin: 20px 0 0; padding: 14px 14px 14px 20px; border-radius: var(--radius-card); background: var(--surface); }
-.pass p { margin: 0; flex: 1; min-width: 0; color: var(--muted); text-wrap: pretty; }
-.pass p b { color: var(--text); font-weight: 600; }
-.glow { animation: glow 2.4s ease-in-out infinite; }
-@keyframes glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 125, 77, 0), 0 0 14px 2px rgba(255, 125, 77, .35); }
-  50% { box-shadow: 0 0 0 3px rgba(255, 125, 77, .28), 0 0 30px 8px rgba(255, 125, 77, .55); }
-}
-.glow:disabled { animation: none; box-shadow: none; }
-@media (prefers-reduced-motion: reduce) { .glow { animation: none; box-shadow: 0 0 0 3px rgba(255, 125, 77, .3), 0 0 22px 4px rgba(255, 125, 77, .45); } }
-@media (max-width: 640px) { .pass { flex-direction: column; align-items: stretch; padding: 16px; } }
-
-/* Controls: pills. The primary is inverted (white, black label); the rest are outlined. */
-select, button, textarea, input { font: inherit; font-size: 13px; color: var(--text); }
-select { width: 128px; height: var(--control-height); padding: 0 10px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--ground); cursor: pointer; }
-select:hover { border-color: var(--control-hover); }
-.btn { height: var(--control-height); padding: 0 14px; border: 1px solid var(--control); border-radius: var(--radius-control); background: none; cursor: pointer; white-space: nowrap; transition: border-color .15s, background-color .15s, transform .1s cubic-bezier(0.23, 1, 0.32, 1); }
-.btn:hover:not(:disabled) { border-color: var(--control-hover); }
-.btn:active:not(:disabled) { transform: scale(.97); }
-.primary { height: 36px; padding: 0 18px; border: 0; background: var(--text); color: var(--ground); font-weight: 600; }
-.primary:hover:not(:disabled) { background: var(--muted); }
-.icon { width: 32px; height: 32px; padding: 0; display: inline-grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--muted); cursor: pointer; }
-.icon:hover:not(:disabled) { background: var(--hover); color: var(--text); }
-button:disabled, select:disabled, textarea:disabled, input:disabled { opacity: .45; cursor: default; }
-svg.i { width: 16px; height: 16px; display: block; }
-
-/* The row menu floats, so it is the one raised surface. */
+/* The row menu floats from its trigger, so it is the one raised surface. */
 .more { position: relative; }
-.more > summary { list-style: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); cursor: pointer; }
+.more > summary { list-style: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); cursor: pointer; transition: background-color .15s ease, color .15s ease; }
 .more > summary::-webkit-details-marker { display: none; }
-.more > summary:hover, .more[open] > summary { background: var(--hover); color: var(--text); }
-.menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; min-width: 200px; padding: 6px; display: grid; gap: 2px; background: var(--raised); border-radius: var(--radius-inner); }
+.more[open] > summary { background: var(--hover); color: var(--text); }
+@media (hover: hover) and (pointer: fine) { .more > summary:hover { background: var(--hover); color: var(--text); } }
+.menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; min-width: 200px; padding: 6px; display: grid; gap: 2px; background: var(--raised); border-radius: var(--radius-inner); transform-origin: top right; transition: opacity .15s var(--ease-out), transform .15s var(--ease-out); }
+@starting-style { .more[open] .menu { opacity: 0; transform: scale(.97); } }
 .menu button { height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: none; text-align: left; cursor: pointer; }
-.menu button:hover { background: var(--raised-hover); }
+@media (hover: hover) and (pointer: fine) { .menu button:hover { background: var(--raised-hover); } }
 .menu .danger { color: var(--negative); }
 
-.skipform { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 10px; }
-.skipform input { flex: 1; min-width: 0; height: var(--control-height); padding: 0 14px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--ground); }
-.skipform input::placeholder, textarea::placeholder { color: var(--faint); }
-
-/* The rail: requests for Claude. */
-.rail { background: var(--surface); border-radius: var(--radius-card); padding: var(--pad); display: grid; gap: var(--gap); }
-@media (min-width: 1000px) { .rail { position: sticky; top: 24px; } }
-@media (max-width: 999px) { .rail { margin-top: 32px; } }
-.rail h2 { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; }
-.rail h2 .num { color: var(--faint); font-weight: 400; }
-.rail p { margin: 0; color: var(--muted); }
-textarea { width: 100%; min-height: 76px; padding: 10px 14px; border: 1px solid var(--control); border-radius: var(--radius-inner); background: var(--ground); resize: vertical; line-height: 20px; }
-textarea:hover { border-color: var(--control-hover); }
-.compose { display: flex; justify-content: flex-end; }
-#queue { list-style: none; margin: 0; padding: 0; }
-.q { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--raised); }
-.q p { flex: 1; min-width: 0; margin: 0; color: var(--text); overflow-wrap: anywhere; }
-#rail-send { width: 100%; }
-
-/* The dock carries the last message and, without the rail beside the list, the Send button. */
-.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); }
+/* The dock: the last message and Send, close to wherever the person acted. */
+.dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); transition: transform .2s var(--ease-out); }
+@starting-style { .dock { transform: translateY(100%); } }
 .dock .in { max-width: 1152px; margin: 0 auto; padding: 10px 24px; min-height: 56px; display: flex; align-items: center; gap: 12px; }
 #status { margin: 0; flex: 1; min-width: 0; color: var(--muted); text-wrap: pretty; }
 #status.err { color: var(--negative); }
-@media (min-width: 1000px) { #dock-send { display: none; } }
 
 @media (max-width: 640px) {
   .top .in, .page, .dock .in { padding-left: 16px; padding-right: 16px; }
   .page { padding-top: 20px; }
   .scope { display: none; }
+  .pass { flex-direction: column; align-items: stretch; padding: 16px; }
+  .ask label { display: none; }
+  .ask input { padding-left: 14px; }
   .tabs { grid-auto-flow: row; grid-template-columns: 1fr 1fr; }
   .tab:last-child:nth-child(odd) { grid-column: 1 / -1; } /* an odd count ends on a full-width cell, never an orphan */
   .tab { padding: 8px 12px 10px; }
+  #filter { width: 100%; }
   .desc { -webkit-line-clamp: 2; }
   .ident .aside { display: none; } /* the name earns the room; the full id stays in the tooltip */
 }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+  .glow::after { animation: none; }
+}
 </style>
 </head>
 <body>
 <div class="top">
   <div class="in">
-    <div class="brand">
+    <div class="brand" translate="no">
       <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="2" y="3" width="18" height="4" rx="2" fill="#ff7d4d"/><rect x="2" y="9" width="12" height="4" rx="2" fill="#e6e6e6"/><rect x="2" y="15" width="7" height="4" rx="2" fill="#444444"/></svg>
       <span>skillset</span><span class="scope" id="project"></span>
     </div>
-    <input type="search" id="filter" placeholder="Filter" aria-label="Filter by name or description">
   </div>
 </div>
 <div class="page">
@@ -179,27 +181,28 @@ textarea:hover { border-color: var(--control-hover); }
     <p id="pass-text"></p>
     <button class="btn primary glow" id="pass-run">Run update pass</button>
   </div>
-  <div class="layout">
-    <main>
-      <div class="loadout" id="loadout" aria-hidden="true"></div>
-      <div class="tabs" id="tabs" role="group" aria-label="Show"></div>
-      <div class="bar" id="toolbar"></div>
-      <ul class="rows" id="list"></ul>
-    </main>
-    <aside class="rail" aria-labelledby="rail-title">
-      <h2 id="rail-title">For Claude <span class="num" id="queue-n"></span></h2>
-      <p>Ask for research or a skill for a job. Requests from the row menus land here too.</p>
-      <textarea id="ask" maxlength="1000" placeholder="Find a skill for writing database migrations" aria-label="Request for Claude"></textarea>
-      <div class="compose"><button class="btn" id="ask-add">Add to queue</button></div>
-      <ul id="queue"></ul>
-      <button class="btn primary" id="rail-send" hidden>Send to Claude</button>
-    </aside>
-  </div>
+  <section class="ask" aria-label="Ask Claude">
+    <form id="ask-form">
+      <label for="ask">Ask Claude</label>
+      <input type="text" id="ask" name="ask" maxlength="1000" autocomplete="off" placeholder="Find a skill for a job, compare two plugins, research a tool…">
+      <button class="btn" id="ask-add" type="submit">Add to queue</button>
+    </form>
+    <ul id="queue" aria-label="Queued for Claude"></ul>
+  </section>
+  <main>
+    <div class="loadout" id="loadout" aria-hidden="true"></div>
+    <div class="tabs" id="tabs" role="group" aria-label="Show"></div>
+    <div class="bar">
+      <input type="search" id="filter" name="filter" autocomplete="off" spellcheck="false" placeholder="Filter by name or description…" aria-label="Filter by name or description">
+      <div id="toolbar"></div>
+    </div>
+    <ul class="rows" id="list"></ul>
+  </main>
 </div>
 <div class="dock" id="dock" hidden>
   <div class="in">
     <p id="status" role="status" aria-live="polite"></p>
-    <button class="btn primary" id="dock-send" hidden>Send to Claude</button>
+    <button class="btn primary" id="send" hidden>Send to Claude</button>
   </div>
 </div>
 <script type="application/json" id="cfg">{{CONFIG}}</script>
@@ -213,10 +216,11 @@ const ABOUT = {
   informative: ['Installed on this machine, switched off in this project.', 'Nothing is switched off here.'],
   updates: ['Newer upstream than what is installed. An update applies to every project on this account.', 'Everything is up to date.'],
 };
-const ASK = { update: 'Review the update of', updates: 'Review every pending update', uninstall: 'Uninstall', similar: 'Find alternatives to', research: 'Research:' };
+const ASK = { update: 'Review the update of', updates: 'Review every pending update', uninstall: 'Uninstall', similar: 'Find alternatives to', research: '' };
 const $ = (id) => document.getElementById(id);
 let state = null;
-let tab = 'essential';
+const TABS = ['untiered', 'essential', 'useful', 'informative', 'updates'];
+let tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'essential'; // the tab lives in the hash, so a reload keeps it
 let stopped = false;
 let checking = false;
 let allUpdates = false;
@@ -249,7 +253,8 @@ function dock() {
   const text = note || (n ? `${plural(n, 'request')} queued for Claude.` : '');
   $('status').textContent = text;
   $('status').className = noteErr ? 'err' : '';
-  for (const id of ['dock-send', 'rail-send']) { $(id).hidden = stopped || !n; $(id).textContent = `Send ${n} to Claude`; }
+  $('send').hidden = stopped || !n;
+  $('send').textContent = `Send ${n} to Claude`;
   $('dock').hidden = !text && !n;
 }
 function say(msg, err = false) {
@@ -262,7 +267,7 @@ function stop(msg, err = true) {
   stopped = true;
   clearTimeout(noteTimer);
   note = msg; noteErr = err;
-  document.querySelectorAll('button, input, textarea, select').forEach((b) => { b.disabled = true; });
+  document.querySelectorAll('button, input, select').forEach((b) => { b.disabled = true; });
   dock();
 }
 
@@ -285,7 +290,7 @@ function ident(name) {
   const colon = name.lastIndexOf(':');
   const at = name.lastIndexOf('@');
   const end = at > colon ? at : name.length;
-  return el('span', { class: 'ident', title: name }, colon >= 0 ? el('span', { class: 'aside' }, name.slice(0, colon + 1)) : null, el('b', {}, name.slice(colon + 1, end)), end < name.length ? el('span', { class: 'aside' }, name.slice(end)) : null);
+  return el('span', { class: 'ident', title: name, translate: 'no' }, colon >= 0 ? el('span', { class: 'aside' }, name.slice(0, colon + 1)) : null, el('b', {}, name.slice(colon + 1, end)), end < name.length ? el('span', { class: 'aside' }, name.slice(end)) : null);
 }
 const matches = (q, ...parts) => !q || parts.join(' ').toLowerCase().includes(q);
 const query = () => $('filter').value.trim().toLowerCase();
@@ -313,7 +318,7 @@ function row(item, tier) {
 
 function updateRow(u) {
   const i = u.id.indexOf(':');
-  const reason = el('input', { type: 'text', placeholder: 'Why skip it? (optional)', maxlength: '300', 'aria-label': `Reason to skip ${u.id}` });
+  const reason = el('input', { type: 'text', name: 'reason', autocomplete: 'off', placeholder: 'Why skip it, e.g. pinned for now…', maxlength: '300', 'aria-label': `Reason to skip ${u.id}` });
   const form = el('div', { class: 'skipform', hidden: true }, reason,
     el('button', { class: 'btn', onclick: () => skipIt(u.id, reason.value) }, 'Skip this version'),
     el('button', { class: 'icon', 'aria-label': 'Cancel', title: 'Cancel', onclick: () => { form.hidden = true; } }, icon('close')));
@@ -356,18 +361,34 @@ function render() {
     used ? `${plural(used, 'update touches', 'updates touch')} what this project uses.` : '',
   ].filter(Boolean).join(' ');
 
+  // The pass banner: shown once a week has gone by since the last update pass.
+  const days = state.passAt ? Math.floor((Date.now() - Date.parse(state.passAt)) / 86400000) : null;
+  $('pass').hidden = !state.passDue || stopped;
+  $('pass-text').replaceChildren(el('b', {}, 'Update pass due. '), days === null
+    ? 'None has run yet. It checks every plugin and skill upstream, then Claude reviews what changed.'
+    : `The last one was ${plural(days, 'day')} ago${all.updates.length ? `, and ${plural(all.updates.length, 'update is', 'updates are')} waiting` : ''}.`);
+  $('pass-run').disabled = checking || stopped;
+  $('pass-run').textContent = checking ? 'Checking…' : 'Run update pass';
+
+  const queue = state.queue || [];
+  $('queue').replaceChildren(...queue.map((it, n) => {
+    const words = [ASK[it.kind], it.id, it.text].filter(Boolean).join(' ');
+    return el('li', { class: 'chip', title: words }, el('span', {}, words),
+      el('button', { class: 'icon', 'aria-label': `Remove “${words}” from the queue`, title: 'Remove', onclick: () => unqueue(n) }, icon('close')));
+  }));
+
   const segs = [['untiered', all.untiered.length], ['essential', e], ['useful', u], ['informative', i]].filter(([, n]) => n);
   $('loadout').replaceChildren(...segs.map(([t, n]) => { const s = el('span', { class: `t-${t}` }); s.style.flexGrow = String(n); return s; }));
 
   const cells = [...(all.untiered.length ? [['untiered', 'Not tiered']] : []), ...TIERS, ['updates', 'Updates']];
-  $('tabs').replaceChildren(...cells.map(([t, label]) => el('button', { class: 'tab', 'aria-pressed': String(t === tab), onclick: () => { tab = t; allUpdates = false; render(); } },
+  $('tabs').replaceChildren(...cells.map(([t, label]) => el('button', { class: 'tab', 'aria-pressed': String(t === tab), onclick: () => { tab = t; allUpdates = false; history.replaceState(null, '', `#${t}`); render(); } },
     el('span', { class: 'lab' }, t === 'updates' ? null : el('span', { class: `dot t-${t}` }), label),
     el('span', { class: 'val' }, String(L[t].length)))));
 
   const items = L[tab];
   const stamp = tab === 'updates' && state.checkedAt ? el('span', { class: 'stamp num' }, `Checked ${new Date(state.checkedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`) : null;
-  const check = tab === 'updates' ? el('button', { class: 'btn', disabled: checking || stopped, onclick: runPass }, checking ? 'Checking…' : 'Run update pass') : null;
-  $('toolbar').replaceChildren(...[el('p', {}, q ? `${plural(items.length, 'match', 'matches')} for “${$('filter').value.trim()}”.` : ABOUT[tab][0]), stamp, check].filter(Boolean));
+  const pass = tab === 'updates' ? el('button', { class: 'btn', disabled: checking || stopped, onclick: runPass }, checking ? 'Checking…' : 'Run update pass') : null;
+  $('toolbar').replaceChildren(...[el('p', {}, q ? `${plural(items.length, 'match', 'matches')} for “${$('filter').value.trim()}”.` : ABOUT[tab][0]), stamp, pass].filter(Boolean));
 
   let rows;
   if (!items.length) rows = [el('li', {}, el('p', { class: 'empty' }, q ? 'Nothing here matches the filter.' : tab === 'updates' && !state.checkedAt ? 'No check has run yet.' : ABOUT[tab][1]))];
@@ -378,25 +399,11 @@ function render() {
   } else rows = items.map((x) => row(x, tab === 'untiered' ? null : tab));
   $('list').replaceChildren(...rows);
 
-  // The pass banner: shown on every tab once a week has gone by since the last update pass.
-  const days = state.passAt ? Math.floor((Date.now() - Date.parse(state.passAt)) / 86400000) : null;
-  $('pass').hidden = !state.passDue || stopped;
-  $('pass-text').replaceChildren(el('b', {}, 'Update pass due. '), days === null
-    ? 'None has run yet. It checks every plugin and skill upstream, then Claude reviews what changed.'
-    : `The last one was ${plural(days, 'day')} ago${all.updates.length ? `, and ${plural(all.updates.length, 'update is', 'updates are')} waiting` : ''}.`);
-  $('pass-run').disabled = checking || stopped;
-  $('pass-run').textContent = checking ? 'Checking…' : 'Run update pass';
-
-  const queue = state.queue || [];
-  $('queue-n').textContent = queue.length ? String(queue.length) : '';
-  $('queue').replaceChildren(...queue.map((it, n) => el('li', { class: 'q' },
-    el('p', {}, [ASK[it.kind], it.id, it.text].filter(Boolean).join(' ')),
-    el('button', { class: 'icon', 'aria-label': 'Remove from the queue', title: 'Remove', onclick: () => unqueue(n) }, icon('close')))));
-  if (stopped) document.querySelectorAll('button, input, textarea, select').forEach((b) => { b.disabled = true; });
+  if (stopped) document.querySelectorAll('button, input, select').forEach((b) => { b.disabled = true; });
   dock();
 }
 
-const load = run(async () => { state = await api('/api/state'); if (state.untiered?.length && tab === 'essential' && !load.done) tab = 'untiered'; load.done = true; render(); });
+const load = run(async () => { state = await api('/api/state'); if (state.untiered?.length && !location.hash && !load.done) tab = 'untiered'; load.done = true; render(); });
 const move = run(async (id, tier, control) => {
   control.disabled = true;
   const r = await api('/api/move', { ids: [id], tier });
@@ -425,13 +432,16 @@ const runPass = run(async () => {
   say('Update pass done: everything is up to date.');
 });
 const send = run(async () => { const r = await api('/api/send', {}); stop(`Sent ${plural(r.count, 'request')} to Claude. You can close this tab.`, false); });
-const addAsk = () => { const text = $('ask').value.trim(); if (!text) return; enqueue({ kind: 'research', text }); $('ask').value = ''; };
 
-$('ask-add').addEventListener('click', addAsk);
+$('ask-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = $('ask').value.trim();
+  if (!text) return $('ask').focus();
+  enqueue({ kind: 'research', text });
+  $('ask').value = '';
+});
 $('pass-run').addEventListener('click', runPass);
-$('ask').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addAsk(); });
-$('dock-send').addEventListener('click', send);
-$('rail-send').addEventListener('click', send);
+$('send').addEventListener('click', send);
 $('filter').addEventListener('input', () => { if (state) render(); });
 document.addEventListener('click', (e) => { const keep = e.target.closest?.('details.more'); document.querySelectorAll('details.more[open]').forEach((d) => { if (d !== keep) d.open = false; }); });
 document.addEventListener('keydown', (e) => {

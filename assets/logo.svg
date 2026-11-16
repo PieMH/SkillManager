@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="t">
+  <title id="t">skillset</title>
+  <rect width="128" height="128" rx="28" fill="#000000"/>
+  <rect x="24" y="29" width="80" height="18" rx="9" fill="#ff7d4d"/>
+  <rect x="24" y="55" width="53" height="18" rx="9" fill="#e6e6e6"/>
+  <rect x="24" y="81" width="31" height="18" rx="9" fill="#444444"/>
+</svg>
