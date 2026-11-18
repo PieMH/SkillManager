@@ -52,6 +52,7 @@ export function startServer({ projectDir, env = process.env, home, idleMs = 30 *
       untiered: reconcile(items, all).untiered.map((id) => view(id, { text: oneLine(byId.get(id)?.description, 120) })),
       updates: pending(st),
       checkedAt: st.checkedAt || null,
+      checkErrors: st.checkErrors || [],
       passAt: st.passAt || null,
       passDue: passDue(st),
       queue,
@@ -108,10 +109,11 @@ export function startServer({ projectDir, env = process.env, home, idleMs = 30 *
         // The update pass: a fresh check, stamped; anything pending goes to Claude at once as one review,
         // with whatever else is queued. With nothing pending the pass is done and the page stays.
         case '/api/pass': {
-          await check(p, io);
-          stampPass(p);
+          const { reached, errors } = await check(p, io);
+          if (reached) stampPass(p);
           const count = pending(readState(p)).length;
-          if (!count) return json(res, 200, { sent: false, state: snapshot() });
+          // Nothing reached: no pass, and nothing goes to Claude as if the check had run.
+          if (!count || !reached) return json(res, 200, { sent: false, reached, errors, state: snapshot() });
           if (!queue.some((q) => q.kind === 'updates')) queue.push({ kind: 'updates', id: null, text: null });
           res.on('finish', () => finish('sent'));
           return json(res, 200, { sent: true, count: queue.length, updates: count });

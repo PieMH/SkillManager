@@ -124,10 +124,11 @@ switch (cmd) {
   }
   case 'check': {
     const p = paths();
+    let reached = true;
     if (!flags.cached) {
       writeState(p, { ...readState(p), checkStartedAt: new Date().toISOString() });
-      await check(p);
-      if (!flags.quiet) stampPass(p); // --quiet is the hook's background run, which is no update pass
+      ({ reached } = await check(p));
+      if (!flags.quiet && reached) stampPass(p); // --quiet is the hook's background run, which is no update pass
     }
     const st = readState(p);
     const list = pending(st);
@@ -138,8 +139,9 @@ switch (cmd) {
     for (const u of list) out.push(`- ${u.id}: ${u.installed} → ${u.latest}  (${u.how})`);
     const skipped = Object.entries(st.skipped || {});
     if (skipped.length) out.push(`Skipped: ${skipped.map(([id, s]) => `${id} ${s.latest}${s.reason ? ` (${s.reason})` : ''}`).join(', ')}`);
-    if (st.checkErrors?.length) out.push(`Not checked: ${st.checkErrors.join('; ')}`);
-    print({ checkedAt: st.checkedAt || null, passAt: st.passAt || null, passDue: passDue(st), updates: list, skipped: st.skipped || {}, errors: st.checkErrors || [] }, out.join('\n'));
+    if (st.checkErrors?.length) out.push(`Not checked, so their last result is kept: ${st.checkErrors.join('; ')}`);
+    if (!reached) out.push('No source could be reached, so this check does not count as the update pass. Try again later.');
+    print({ checkedAt: st.checkedAt || null, reached, passAt: st.passAt || null, passDue: passDue(st), updates: list, skipped: st.skipped || {}, errors: st.checkErrors || [] }, out.join('\n'));
     break;
   }
   case 'skip': {

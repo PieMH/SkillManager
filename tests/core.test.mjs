@@ -10,7 +10,7 @@ import { frontmatter, inventory, oneLine } from '../scripts/lib/inventory.mjs';
 import { apply, digest, parse, reconcile, render, setTier, summarize } from '../scripts/lib/tiers.mjs';
 import { dismiss, sessionStart } from '../scripts/lib/session.mjs';
 import { check, due, newer, passDue, pending, readState, skip, writeState } from '../scripts/lib/updates.mjs';
-import { report, scan } from '../scripts/lib/scan.mjs';
+import { report, runProcess, scan, which } from '../scripts/lib/scan.mjs';
 import { paths } from '../scripts/lib/inventory.mjs';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
@@ -142,6 +142,12 @@ res = apply(project, parsed.items);
 assert.match(res.error, /not valid JSON/);
 assert.equal(fs.readFileSync(local, 'utf8'), '{ broken', 'a broken settings file is left alone');
 fs.rmSync(local);
+const blocker = `${local}.${process.pid}.tmp`; // a folder where the swap file goes makes the write fail on every OS
+fs.mkdirSync(blocker);
+res = apply(project, parsed.items);
+assert.deepEqual([/could not be written/.test(res.error), fs.existsSync(local), fs.statSync(blocker).isDirectory()], [true, false, true], 'a failed write is reported, and nothing else is removed');
+assert.match(digest({ items: parsed.items, things: inv.things, applied: res }), /could not apply the tiers: .*could not be written/, 'the digest still prints and says why');
+fs.rmdirSync(blocker);
 
 // --- reconcile and digest ------------------------------------------------------------------------
 const drift = reconcile(parse(text + '\n## Useful\n- `skill:ghost` — gone\n').items, inv.things);
@@ -226,7 +232,7 @@ const ip = JSON.parse(fs.readFileSync(path.join(cfg, 'plugins', 'installed_plugi
 ip.plugins['local@dirmkt'] = [{ scope: 'user', installPath: dirMkt, version: '0.2.0' }];
 write(path.join(cfg, 'plugins', 'installed_plugins.json'), ip);
 write(path.join(cfg, 'plugins', 'known_marketplaces.json'), { mkt: { source: { source: 'github', repo: 'acme/mkt' } }, dirmkt: { source: { source: 'directory', path: dirMkt } } });
-write(path.join(home, '.agents', '.skill-lock.json'), { version: 3, skills: { humanizer: { source: 'acme/humanizer', sourceType: 'github', sourceUrl: 'https://github.com/acme/humanizer.git', skillPath: 'SKILL.md', skillFolderHash: 'a'.repeat(40) }, gone: { source: 'acme/gone', sourceType: 'github', skillPath: 'SKILL.md', skillFolderHash: 'c'.repeat(40) } } });
+write(path.join(home, '.agents', '.skill-lock.json'), { version: 3, skills: { humanizer: { source: 'acme/humanizer', sourceType: 'github', sourceUrl: 'https://github.com/acme/humanizer.git', skillPath: 'SKILL.md', skillFolderHash: 'a'.repeat(40) }, gone: { source: 'acme/gone', sourceType: 'github', skillPath: 'SKILL.md', skillFolderHash: 'c'.repeat(40) }, emil: { source: 'acme/kit', sourceType: 'github', skillPath: './skills/emil/SKILL.md', skillFolderHash: 'd'.repeat(40) } } });
 skill(path.join(cfg, 'skills'), 'cloned', 'A skill kept in a git clone.');
 fs.mkdirSync(path.join(cfg, 'skills', 'cloned', '.git'));
 const calls = [];
@@ -238,7 +244,10 @@ const io = {
       if (file === 'notes/.claude-plugin/plugin.json') return { version: '2.0.0' };
       return null;
     },
-    async api(route) { calls.push(`api ${route}`); return { sha: 'b'.repeat(40), tree: [] }; },
+    async api(route) {
+      calls.push(`api ${route}`);
+      return { sha: 'b'.repeat(40), tree: [{ path: 'skills/emil', type: 'tree', sha: 'e'.repeat(40) }, { path: 'skills/emil/SKILL.md', type: 'blob', sha: 'f'.repeat(40) }] };
+    },
   },
   git: (cwd, args) => (args[0] === 'rev-parse' ? '1111111aaaa' : '2222222bbbb\tHEAD'),
 };
@@ -249,12 +258,39 @@ assert.deepEqual(found.errors, []);
 assert.deepEqual(found.updates.map((u) => `${u.id} ${u.installed}→${u.latest}`).sort(), ['plugin:local@dirmkt 0.2.0→0.3.0', 'plugin:tool@mkt 1.0.0→1.1.0', 'skill:cloned 1111111→2222222', 'skill:humanizer aaaaaaa→bbbbbbb']);
 assert.equal(calls.filter((c) => c.endsWith('marketplace.json')).length, 1, 'one marketplace manifest per marketplace');
 assert.ok(!calls.some((c) => c.includes('acme/gone')), 'a lock entry with no folder in this profile is not checked');
-assert.match(found.updates.find((u) => u.id === 'plugin:tool@mkt').how, /claude plugin marketplace update mkt && claude plugin update tool@mkt/);
+assert.equal(found.updates.find((u) => u.id === 'plugin:tool@mkt').how, 'claude plugin marketplace update mkt && claude plugin update tool@mkt --scope user', 'the update names the install it compared');
+const pScoped = paths({ CLAUDE_CONFIG_DIR: path.join(home, '.claude-scoped') }, home);
+write(path.join(pScoped.configDir, 'plugins', 'known_marketplaces.json'), { dirmkt: { source: { source: 'directory', path: dirMkt } } });
+write(path.join(pScoped.configDir, 'plugins', 'installed_plugins.json'), { version: 2, plugins: { 'local@dirmkt': [{ scope: 'project', projectPath: path.join(root, 'elsewhere'), installPath: dirMkt, version: '0.2.0' }] } });
+assert.equal((await check(pScoped, io)).updates[0]?.how, `claude plugin marketplace update dirmkt && cd "${fwd(path.join(root, 'elsewhere'))}" && claude plugin update local@dirmkt --scope project`, 'a project install is updated from its project');
+// Most repos keep their skills in subfolders: the check compares that folder's tree hash, not the repo's.
+const pKit = paths({ CLAUDE_CONFIG_DIR: path.join(home, '.claude-kit') }, home);
+skill(path.join(pKit.configDir, 'skills'), 'emil', 'A skill in a subfolder of its repo.');
+skill(path.join(root, 'clones', 'kit2', 'skills'), 'viaclone', 'A skill linked from a git clone.');
+write(path.join(root, 'clones', 'kit2', '.git', 'config'), '[core]\n\tbare = false\n[remote "origin"]\n\turl = https://github.com/acme/kit2.git\n');
+fs.symlinkSync(path.join(root, 'clones', 'kit2', 'skills', 'viaclone'), path.join(pKit.configDir, 'skills', 'viaclone'), 'junction');
+assert.equal(inventory({ projectDir: project, env: { CLAUDE_CONFIG_DIR: pKit.configDir }, home }).things.find((t) => t.id === 'skill:viaclone')?.source, 'https://github.com/acme/kit2', 'a linked skill names the clone it lives in');
+assert.deepEqual((await check(pKit, io)).updates.map((u) => `${u.id} ${u.installed}→${u.latest}`), ['skill:emil ddddddd→eeeeeee', 'skill:viaclone 1111111→2222222']);
 const st = readState(p);
 assert.ok(st.checkedAt && st.dismissed?.length, 'the check keeps the rest of the state');
 assert.deepEqual(pending(st).map((u) => u.id).sort(), ['plugin:local@dirmkt', 'plugin:tool@mkt', 'skill:humanizer'], 'a skipped version is not proposed again');
 assert.equal(pending({ ...st, skipped: { 'skill:cloned': { latest: 'older' } } }).length, 4, 'a newer version than the skipped one is proposed');
 assert.match(digest({ items: parsed.items, things: inv.things, updates: pending(st) }), /Updates available upstream: .*`plugin:local@dirmkt 0\.2\.0 → 0\.3\.0`.*\/skillmanager-update/);
+
+// An outage keeps the last result of what it could not reach, and is no update pass when nothing answered.
+const down = { get: { raw: async () => { throw new Error('fetch failed'); }, api: async () => { throw new Error('GitHub API 403'); } }, git: () => null };
+const before = readState(p).updates.map((u) => u.id).sort();
+writeState(p, { ...readState(p), updates: [...readState(p).updates, { id: 'plugin:notes@mkt', installed: '1.9.0', latest: '2.0.0', how: 'x' }] }); // applied since: 2.0.0 is installed
+const partial = await check(p, down);
+assert.deepEqual([partial.reached, partial.errors.length], [false, 5], 'a local marketplace answers offline too, so it proves nothing');
+assert.deepEqual(readState(p).updates.map((u) => u.id).sort(), before, 'an outage keeps what is still pending, and drops what was applied since');
+const cfgOff = path.join(home, '.claude-off');
+skill(path.join(cfgOff, 'skills'), 'clone2', 'Another skill kept in a git clone.');
+fs.mkdirSync(path.join(cfgOff, 'skills', 'clone2', '.git'));
+const pOff = paths({ CLAUDE_CONFIG_DIR: cfgOff }, home);
+writeState(pOff, { updates: [{ id: 'skill:clone2', installed: '1111111', latest: '2222222', how: 'x' }] });
+const offline = await check(pOff, down);
+assert.deepEqual([offline.reached, offline.updates.map((u) => u.id)], [false, ['skill:clone2']], 'nothing reached: the last result is kept');
 
 // --- scan ----------------------------------------------------------------------------------------
 const bad = path.join(root, 'bad-plugin');
@@ -286,6 +322,15 @@ assert.deepEqual(scan(bad, { things: inv.things, find: () => null }).skillspecto
 const one = scan(path.join(cfg, 'skills', 'humanizer', 'SKILL.md'), { things: inv.things, external: false });
 assert.deepEqual([one.kind, one.collisions[0]?.what, one.skillspector], ['skill', 'skill name humanizer', null]);
 assert.throws(() => scan(path.join(root, 'nowhere')), /does not exist/);
+if (process.platform === 'win32') {
+  // npm on Windows: an extensionless shell script next to the .cmd. The .cmd is the one that runs, through the shell.
+  const bin = path.join(root, 'npm bin');
+  write(path.join(bin, 'fakecli'), '#!/bin/sh\necho no\n');
+  write(path.join(bin, 'fakecli.cmd'), '@echo %*\r\n');
+  const exe = which('fakecli', { PATH: bin, PATHEXT: '.COM;.EXE;.BAT;.CMD' });
+  assert.equal(path.basename(exe), 'fakecli.cmd');
+  assert.equal(runProcess(exe, ['a b', 'c'], 10000).stdout.trim(), '"a b" "c"', 'a .cmd runs, with spaces kept inside one argument');
+}
 
 run = cli('scan', bad, '--no-external');
 assert.equal(run.status, 0, run.stderr);
@@ -362,20 +407,25 @@ assert.deepEqual(exited, { reason: 'sent', queue: [{ kind: 'research', id: null,
 assert.ok(Date.now() - Date.parse(readState(p).passAt) < 60000, 'the pass is stamped');
 await assert.rejects(call('GET', '/api/state', { headers: auth }), 'the server stops after sending');
 
-skip(p, 'skill:humanizer', 'not now');
-const quietPage = await startServer({ projectDir: project, env, home, io, onExit: () => {} });
-got = await new Promise((resolve, reject) => {
-  const data = '{}';
-  const rq = http.request({ host: '127.0.0.1', port: quietPage.port, method: 'POST', path: '/api/pass', headers: { host: `127.0.0.1:${quietPage.port}`, 'x-skillmanager-token': quietPage.token, 'content-type': 'application/json', 'content-length': 2 } }, (rs) => {
+const passOn = (srv) => new Promise((resolve, reject) => {
+  const rq = http.request({ host: '127.0.0.1', port: srv.port, method: 'POST', path: '/api/pass', headers: { host: `127.0.0.1:${srv.port}`, 'x-skillmanager-token': srv.token, 'content-type': 'application/json', 'content-length': 2 } }, (rs) => {
     let s = '';
     rs.on('data', (c) => { s += c; });
     rs.on('end', () => resolve(JSON.parse(s)));
   });
   rq.on('error', reject);
-  rq.end(data);
+  rq.end('{}');
 });
+skip(p, 'skill:humanizer', 'not now');
+const quietPage = await startServer({ projectDir: project, env, home, io, onExit: () => {} });
+got = await passOn(quietPage);
 assert.deepEqual([got.sent, got.state.updates, got.state.passDue], [false, [], false], 'with nothing pending the pass is done and the page stays');
 quietPage.close();
+const offPage = await startServer({ projectDir: project, env: { CLAUDE_CONFIG_DIR: cfgOff }, home, io: down, onExit: () => {} });
+got = await passOn(offPage);
+assert.deepEqual([got.sent, got.reached, got.errors.length, got.state.updates.length, got.state.passDue, got.state.checkErrors.length], [false, false, 1, 1, true, 1], 'an offline pass says so, stays due and sends nothing to Claude');
+assert.equal(readState(pOff).passAt, undefined);
+offPage.close();
 
 const idle = await new Promise((resolve) => { startServer({ projectDir: project, env, home, idleMs: 40, onExit: resolve }); });
 assert.deepEqual(idle, { reason: 'idle', queue: [] }, 'an unused page stops by itself');

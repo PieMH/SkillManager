@@ -48,7 +48,7 @@ Before anything is installed, `scan` reads it (never runs it) and reports what i
 
 ## Updates
 
-An update check compares each plugin's installed version with its marketplace, each `npx skills` install with its GitHub folder, and each skill kept in a git clone with its remote. It changes nothing. Two things run it:
+An update check compares each plugin's installed version with its marketplace, each `npx skills` install with its GitHub folder, and each skill kept in a git clone with its remote. It changes nothing. A source it cannot reach (offline, GitHub's rate limit) keeps the result of the last check, and a check that reaches no source at all does not count as the update pass. Two things run it:
 
 - **The update pass, once a week, from you.** The band marks it due seven days after the last one, in whatever session you are in. **Run update pass** on the status page (or asking `/skillmanager-update` for updates) runs the check, and Claude reviews each update against the project and applies or skips it. A skipped version is not proposed again.
 - **A silent background check at session start.** The SessionStart hook (a new session, `/resume`, `/clear` or a compaction; never a prompt) starts it once a week when it is due and returns at once, so the band's update count stays fresh. It is not a pass and asks nothing of you.

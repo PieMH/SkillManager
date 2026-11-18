@@ -167,10 +167,16 @@ export function apply(projectDir, items, drop = []) {
 
   const wrote = JSON.stringify(next) !== JSON.stringify(cur);
   if (wrote) {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`; // Claude Code watches this file, so swap it in whole
-    fs.writeFileSync(tmp, JSON.stringify(next, null, 2) + '\n');
-    fs.renameSync(tmp, file);
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(tmp, JSON.stringify(next, null, 2) + '\n');
+      fs.renameSync(tmp, file);
+    } catch (err) {
+      // A read-only or locked file: report it like a broken one, so the digest still prints and says why.
+      try { fs.rmSync(tmp, { force: true }); } catch { /* not ours to remove */ }
+      return { changes: [], wrote: false, unenforced: d.unenforced, error: `${fwd(file)} could not be written (${err.code || err.message}), so it was left as it was` };
+    }
   }
   return { changes, wrote, unenforced: d.unenforced, reload: changes.some((c) => c.kind === 'plugin') };
 }

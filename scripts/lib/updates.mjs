@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { readJson, samePath } from './inventory.mjs';
+import { gitRoot, readJson } from './inventory.mjs';
 
 const WEEK = 7 * 24 * 3600 * 1000;
 const UA = { 'User-Agent': 'skillmanager-plugin' }; // GitHub's API refuses requests without one
@@ -62,7 +62,9 @@ async function offered(entry, readFile) {
   return null; // shortcut: git-url and npm plugin sources are not checked; add them when one is installed
 }
 
-async function pluginUpdates(p, get, errors) {
+// Each source counts the remotes it tried and maps the ids it could not reach to what is installed now
+// (`log.failed`), so check() keeps their last result instead of reading an outage as "up to date".
+async function pluginUpdates(p, get, log) {
   const installed = readJson(path.join(p.configDir, 'plugins', 'installed_plugins.json'))?.plugins || {};
   const markets = readJson(path.join(p.configDir, 'plugins', 'known_marketplaces.json')) || {};
   const manifests = new Map();
@@ -76,11 +78,14 @@ async function pluginUpdates(p, get, errors) {
     if (src.source === 'directory' && src.path) readFile = async (repo, file) => (repo ? null : readJson(path.join(src.path, file)));
     else if (src.source === 'github' && src.repo) readFile = (repo, file, ref) => get.raw(repo || src.repo, file, ref);
     else continue;
+    if (src.source !== 'directory') log.tried++; // a local folder answers offline too, so it proves nothing
     try {
       if (!manifests.has(mkt)) manifests.set(mkt, await readFile(null, '.claude-plugin/marketplace.json'));
       const latest = await offered(manifests.get(mkt)?.plugins?.find((x) => x.name === name), readFile);
-      if (newer(latest, e.version)) out.push({ id: `plugin:${id}`, installed: e.version, latest, how: `claude plugin marketplace update ${mkt} && claude plugin update ${id}` });
-    } catch (err) { errors.push(`${id}: ${err.message}`); }
+      // The scope names the install compared here; without it, the project's own install would be updated instead.
+      const cd = e.scope !== 'user' && e.projectPath ? `cd "${String(e.projectPath).replace(/\\/g, '/')}" && ` : '';
+      if (newer(latest, e.version)) out.push({ id: `plugin:${id}`, installed: e.version, latest, how: `claude plugin marketplace update ${mkt} && ${cd}claude plugin update ${id} --scope ${e.scope}` });
+    } catch (err) { log.errors.push(`${id}: ${err.message}`); log.failed.set(`plugin:${id}`, e.version); }
   }
   return out;
 }
@@ -89,7 +94,7 @@ async function pluginUpdates(p, get, errors) {
 // tree listing per repo tells which folders changed upstream.
 // shortcut: a skill installed with `--rename` never matches its upstream tree, so it always shows as
 // pending until skipped; read the lock's own `computedHash` if the skills CLI starts writing it here.
-async function lockUpdates(p, get, errors) {
+async function lockUpdates(p, get, log) {
   const lock = readJson(path.join(p.home, '.agents', '.skill-lock.json'))?.skills || {};
   const byRepo = new Map();
   for (const [key, s] of Object.entries(lock)) {
@@ -99,6 +104,7 @@ async function lockUpdates(p, get, errors) {
   }
   const out = [];
   for (const [repo, skills] of byRepo) {
+    log.tried++;
     try {
       const tree = await get.api(`repos/${repo}/git/trees/HEAD?recursive=1`);
       const sha = new Map((tree?.tree || []).filter((t) => t.type === 'tree').map((t) => [t.path, t.sha]));
@@ -107,13 +113,13 @@ async function lockUpdates(p, get, errors) {
         const now = dir === '.' || dir === '' ? tree?.sha : sha.get(dir);
         if (now && now !== s.skillFolderHash) out.push({ id: `skill:${key}`, installed: s.skillFolderHash.slice(0, 7), latest: now.slice(0, 7), how: `npx skills update ${key}` });
       }
-    } catch (err) { errors.push(`${repo}: ${err.message}`); }
+    } catch (err) { log.errors.push(`${repo}: ${err.message}`); for (const [key, s] of skills) log.failed.set(`skill:${key}`, s.skillFolderHash.slice(0, 7)); }
   }
   return out;
 }
 
 // Skills that live in a git clone (linked into the skills folder): local HEAD against the remote's.
-function cloneUpdates(p, git, errors) {
+function cloneUpdates(p, git, log) {
   const lock = readJson(path.join(p.home, '.agents', '.skill-lock.json'))?.skills || {};
   const out = [];
   const dir = path.join(p.configDir, 'skills');
@@ -121,19 +127,18 @@ function cloneUpdates(p, git, errors) {
   try { names = fs.readdirSync(dir).filter((n) => !n.startsWith('.') && n !== 'synced' && !lock[n]); } catch { return out; }
   const roots = new Map();
   for (const n of names) {
-    let d;
-    try { d = fs.realpathSync(path.join(dir, n)); } catch { continue; }
-    for (let i = 0; i < 4 && !samePath(d, p.home); i++) {
-      if (fs.existsSync(path.join(d, '.git'))) { roots.set(d, [...(roots.get(d) || []), n]); break; }
-      const up = path.dirname(d);
-      if (up === d) break;
-      d = up;
-    }
+    const d = gitRoot(path.join(dir, n), p.home);
+    if (d) roots.set(d, [...(roots.get(d) || []), n]);
   }
   for (const [root, skills] of roots) {
+    log.tried++;
     const head = git(root, ['rev-parse', 'HEAD']);
     const remote = git(root, ['ls-remote', 'origin', 'HEAD'])?.split(/\s/)[0];
-    if (!head || !remote) { errors.push(`${root.replace(/\\/g, '/')}: git could not compare with origin`); continue; }
+    if (!head || !remote) {
+      log.errors.push(`${root.replace(/\\/g, '/')}: git could not compare with origin`);
+      for (const n of skills) log.failed.set(`skill:${n}`, head ? head.slice(0, 7) : null);
+      continue;
+    }
     if (head !== remote) for (const n of skills) out.push({ id: `skill:${n}`, installed: head.slice(0, 7), latest: remote.slice(0, 7), how: `git -C "${root.replace(/\\/g, '/')}" pull --ff-only` });
   }
   return out;
@@ -162,10 +167,14 @@ export const live = {
   },
 };
 
+// `reached` is false when every source failed (offline, rate-limited): such a check is no update pass.
 export async function check(p, io = live) {
-  const errors = [];
-  const updates = [...await pluginUpdates(p, io.get, errors), ...await lockUpdates(p, io.get, errors), ...cloneUpdates(p, io.git, errors)];
+  const log = { tried: 0, errors: [], failed: new Map() };
+  const found = [...await pluginUpdates(p, io.get, log), ...await lockUpdates(p, io.get, log), ...cloneUpdates(p, io.git, log)];
   const state = readState(p); // re-read: a session may have written it while the network calls ran
-  writeState(p, { ...state, checkedAt: new Date().toISOString(), updates, checkErrors: errors });
-  return { updates, errors };
+  // A kept update must still describe what is installed: one applied since then is gone, not pending.
+  const stillInstalled = (u) => log.failed.has(u.id) && (log.failed.get(u.id) == null || log.failed.get(u.id) === u.installed);
+  const updates = [...found, ...(state.updates || []).filter(stillInstalled)];
+  writeState(p, { ...state, checkedAt: new Date().toISOString(), updates, checkErrors: log.errors });
+  return { updates, errors: log.errors, reached: !log.tried || log.errors.length < log.tried };
 }

@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { frontmatter, mdIn, readJson, skillsIn } from './inventory.mjs';
+import { frontmatter, hookGroups, mcpServers, mdIn, readJson, skillsIn } from './inventory.mjs';
 
 const fwd = (p) => String(p).replace(/\\/g, '/');
 const SKIP = new Set(['.git', 'node_modules', '.venv', 'venv', '__pycache__', 'dist', 'build']);
@@ -44,19 +44,14 @@ const tokens = (s) => String(s || '').match(/"[^"]*"|'[^']*'|\S+/g)?.map((t) => 
 const exeName = (t) => path.basename(String(t || '')).replace(/\.(exe|cmd|bat)$/i, '');
 const bundled = (t) => /\$\{CLAUDE_PLUGIN_ROOT\}/.test(t);
 
-// `hooks` in plugin.json is a path, a list of paths or an inline object; the default is hooks/hooks.json.
 function hooksOf(manifest, root) {
   const out = [];
-  for (const f of manifest.hooks == null ? ['hooks/hooks.json'] : [].concat(manifest.hooks)) {
-    const j = typeof f === 'string' ? readJson(path.join(root, f)) : f;
-    const h = j?.hooks ?? (typeof f === 'string' ? null : j);
-    for (const [event, groups] of Object.entries(h || {})) {
-      for (const g of Array.isArray(groups) ? groups : []) {
-        for (const hk of g.hooks || []) {
-          const parts = [...tokens(hk.command), ...(hk.args || []).map(String)];
-          const scripts = parts.filter(bundled).map((t) => path.join(root, t.replace(/^.*\$\{CLAUDE_PLUGIN_ROOT\}[\\/]?/, '')));
-          out.push({ event, matcher: g.matcher || '*', runs: bundled(parts[0] || '') ? 'bundled script' : exeName(parts[0]) || hk.type, exe: bundled(parts[0] || '') ? null : exeName(parts[0]), scripts });
-        }
+  for (const [event, groups] of hookGroups(manifest, root)) {
+    for (const g of groups) {
+      for (const hk of g?.hooks || []) {
+        const parts = [...tokens(hk.command), ...(hk.args || []).map(String)];
+        const scripts = parts.filter(bundled).map((t) => path.join(root, t.replace(/^.*\$\{CLAUDE_PLUGIN_ROOT\}[\\/]?/, '')));
+        out.push({ event, matcher: g.matcher || '*', runs: bundled(parts[0] || '') ? 'bundled script' : exeName(parts[0]) || hk.type, exe: bundled(parts[0] || '') ? null : exeName(parts[0]), scripts });
       }
     }
   }
@@ -65,10 +60,7 @@ function hooksOf(manifest, root) {
 
 // Names only: an MCP definition's values (env, args, URL path) are where tokens live.
 function mcpOf(manifest, root) {
-  let v = manifest.mcpServers ?? '.mcp.json';
-  if (typeof v === 'string') { const j = readJson(path.join(root, v)); v = j?.mcpServers ?? j; }
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return [];
-  return Object.entries(v).map(([name, def]) => {
+  return Object.entries(mcpServers(manifest, root)).map(([name, def]) => {
     const refs = [...JSON.stringify(def || {}).matchAll(/\$\{([A-Z_][A-Z0-9_]*)/g)].map((m) => m[1]).filter((n) => !ROOT_VARS.test(n));
     let host = null;
     try { if (def?.url) host = new URL(String(def.url).replace(/\$\{[^}]*\}/g, 'x')).host; } catch { host = 'remote'; }
@@ -78,7 +70,9 @@ function mcpOf(manifest, root) {
 
 export function which(exe, env = process.env) {
   if (!exe) return null;
-  const exts = process.platform === 'win32' ? ['', ...(env.PATHEXT || '.EXE;.CMD;.BAT').split(';').map((e) => e.toLowerCase())] : [''];
+  // Windows: the PATHEXT forms first, the bare name last. npm puts an extensionless shell script, which Windows
+  // cannot run, next to the .cmd it uses.
+  const exts = process.platform === 'win32' ? [...(env.PATHEXT || '.EXE;.CMD;.BAT').split(';').filter(Boolean).map((e) => e.toLowerCase()), ''] : [''];
   for (const dir of (env.PATH || env.Path || '').split(path.delimiter).filter(Boolean)) {
     for (const ext of exts) { const f = path.join(dir, exe + ext); try { if (fs.statSync(f).isFile()) return f; } catch { /* next */ } }
   }
@@ -168,7 +162,13 @@ function validate(root, run, exe) {
   return { ok: r.status === 0, status: r.status, report };
 }
 
-const runProcess = (exe, args, timeout) => spawnSync(exe, args, { encoding: 'utf8', timeout, windowsHide: true, maxBuffer: 64 * 1024 * 1024 });
+// A .cmd or .bat shim (npm's install on Windows) runs only through the shell, as one quoted command line.
+// shortcut: cmd still expands %VAR% inside quotes, so a path holding one is misread; pass such paths another way if one shows up.
+export function runProcess(exe, args, timeout) {
+  const opts = { encoding: 'utf8', timeout, windowsHide: true, maxBuffer: 64 * 1024 * 1024 };
+  if (!/\.(cmd|bat)$/i.test(exe)) return spawnSync(exe, args, opts);
+  return spawnSync([exe, ...args].map((a) => `"${a}"`).join(' '), { ...opts, shell: true });
+}
 
 export function scan(target, { things = [], env = process.env, external = true, run = runProcess, find = which } = {}) {
   let root = path.resolve(target);

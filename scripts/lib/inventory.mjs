@@ -70,17 +70,13 @@ export const mdIn = (dir) => listDir(dir).filter((n) => n.endsWith('.md')).map((
   return { name: fm.name || n.slice(0, -3), description: fm.description || '', file: path.join(dir, n) };
 });
 
-// The origin remote of the git clone a skill lives in, if any. Stops at the home dir so a
-// dotfiles repo there is not mistaken for the skill's source.
-function gitRemote(dir, home) {
+// The git clone a folder lives in, following links. Stops at the home dir so a dotfiles repo there is
+// not mistaken for a skill's source. The update check uses it too.
+export function gitRoot(dir, home) {
   let d;
   try { d = fs.realpathSync(dir); } catch { return null; }
   for (let i = 0; i < 4 && !samePath(d, home); i++) {
-    const cfg = readText(path.join(d, '.git', 'config'));
-    if (cfg) {
-      const m = /\[remote "origin"\][^[]*?url\s*=\s*(\S+)/.exec(cfg);
-      return m ? m[1].replace(/\.git$/, '') : null;
-    }
+    if (exists(path.join(d, '.git'))) return d;
     const up = path.dirname(d);
     if (up === d) break;
     d = up;
@@ -88,21 +84,29 @@ function gitRemote(dir, home) {
   return null;
 }
 
-// `hooks` in a plugin manifest is a path, a list of paths or an inline object; default hooks/hooks.json.
-function hookEvents(value, root) {
-  const events = new Set();
-  for (const f of value == null ? ['hooks/hooks.json'] : [].concat(value)) {
-    const j = typeof f === 'string' ? readJson(path.join(root, f)) : f;
-    const h = j?.hooks ?? (typeof f === 'string' ? null : j);
-    for (const [event, groups] of Object.entries(h || {})) if (Array.isArray(groups) && groups.length) events.add(event);
-  }
-  return [...events];
+function gitRemote(dir, home) {
+  const root = gitRoot(dir, home);
+  const m = root && /\[remote "origin"\][^[]*?url\s*=\s*(\S+)/.exec(readText(path.join(root, '.git', 'config')));
+  return m ? m[1].replace(/\.git$/, '') : null;
 }
 
-function mcpNames(manifest, root) {
+// A plugin's hook groups as [event, groups] pairs. `hooks` in its manifest is a path, a list of paths or an
+// inline object; the default is hooks/hooks.json. The scanner reads hooks through this too.
+export function hookGroups(manifest, root) {
+  const out = [];
+  for (const f of manifest.hooks == null ? ['hooks/hooks.json'] : [].concat(manifest.hooks)) {
+    const j = typeof f === 'string' ? readJson(path.join(root, f)) : f;
+    const h = j?.hooks ?? (typeof f === 'string' ? null : j);
+    for (const [event, groups] of Object.entries(h || {})) if (Array.isArray(groups)) out.push([event, groups]);
+  }
+  return out;
+}
+
+// A plugin's MCP server definitions by name: `mcpServers` in its manifest, inline or a path; default .mcp.json.
+export function mcpServers(manifest, root) {
   let v = manifest.mcpServers ?? '.mcp.json';
   if (typeof v === 'string') { const j = readJson(path.join(root, v)); v = j?.mcpServers ?? j; }
-  return v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v) : [];
+  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
 }
 
 // shortcut: default component folders only, a manifest's custom `skills`/`agents` paths are not followed;
@@ -113,8 +117,8 @@ function describePlugin(root) {
   const c = {
     skills: [...skillsIn(path.join(root, 'skills')).map((s) => s.name), ...commands],
     agents: mdIn(path.join(root, 'agents')).map((a) => a.name),
-    hooks: hookEvents(manifest.hooks, root),
-    mcp: mcpNames(manifest, root),
+    hooks: [...new Set(hookGroups(manifest, root).filter(([, groups]) => groups.length).map(([event]) => event))],
+    mcp: Object.keys(mcpServers(manifest, root)),
     bin: exists(path.join(root, 'bin')),
     lsp: Boolean(manifest.lspServers) || exists(path.join(root, '.lsp.json')),
   };

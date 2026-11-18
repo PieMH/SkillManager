@@ -1,9 +1,8 @@
 // Discovery: candidates for a job, from four public sources. It installs nothing and judges nothing:
 // /skillmanager-update filters the candidates by the project's scope and sends the promising ones through `scan`.
 // The search words leave the machine (SkillsMP, GitHub); the marketplace list is read through the local CLI.
-import { spawnSync } from 'node:child_process';
 import { oneLine } from './inventory.mjs';
-import { which } from './scan.mjs';
+import { runProcess, which } from './scan.mjs';
 
 const UA = { 'User-Agent': 'skillmanager-plugin' };
 const STOP = new Set('the and for with from that this into your skill skills plugin plugins claude code agent agents'.split(' '));
@@ -29,8 +28,7 @@ export const live = {
   plugins(env = process.env) {
     const exe = which('claude', env);
     if (!exe) throw new Error('the claude CLI is not on the PATH');
-    // The arguments are fixed, so a .cmd shim can go through the shell without quoting risk.
-    const r = spawnSync(exe, ['plugin', 'list', '--json', '--available'], { encoding: 'utf8', timeout: 90000, windowsHide: true, maxBuffer: 64 * 1024 * 1024, shell: /\.(cmd|bat)$/i.test(exe) });
+    const r = runProcess(exe, ['plugin', 'list', '--json', '--available'], 90000);
     if (r.status !== 0) throw new Error('`claude plugin list --available` failed');
     return JSON.parse(r.stdout).available || [];
   },

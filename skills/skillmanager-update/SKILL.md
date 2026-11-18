@@ -47,7 +47,7 @@ The digest or `status` reports it:
 
 ## Updates
 
-1. `check --cached` lists what the last check found. Run `check` (network, about ten seconds) when there is no result or the user wants a fresh one. A `check` you run counts as the weekly update pass; the band above the prompt marks the pass due again after seven days.
+1. `check --cached` lists what the last check found. Run `check` (network, about ten seconds) when there is no result or the user wants a fresh one. A `check` you run counts as the weekly update pass unless it reaches no source; the band above the prompt marks the pass due again after seven days. Report any `Not checked` line to the user.
 2. For each update the user wants reviewed, read what changed upstream: the release notes or CHANGELOG, or `https://github.com/<owner>/<repo>/compare/<installed>...<latest>` for commit-pinned skills. Review several skills from the same repo together. If the change adds hooks, MCP servers, scripts or permissions, clone the new version and scan it as in Install.
 3. Apply the update when it fits the project's scope and is safe. Otherwise run `skip <id> --reason "<why>"` so it is not proposed again until a newer version appears.
 4. Apply with the update's `how` command once the user agrees. Updates are per account, not per project, so say so. Plugin updates need a restart.
