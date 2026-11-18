@@ -47,6 +47,8 @@ export const register: Register = on => {
     if (!s.tiered && s.dismissed) return next(e) // the person declined tiering here: no row
 
     const { Box, Text, Button } = $.ui.resolve(e)
+    // bodyColumns counts terminal cells; a graphical surface draws a Button wider than its cells, so a row sized to it wraps.
+    const width = e.surface === 'terminal' ? e.props.bodyColumns : undefined
     // Queued by the engine and run once the session is idle, so a click never cuts into a turn.
     const run = (command: string) => () => {
       void $.command.run({ command }).catch(() => $.ui.toast(`SkillManager: could not run /${command}`))
@@ -54,7 +56,7 @@ export const register: Register = on => {
 
     if (!s.tiered) {
       return (
-        <Box flexDirection="row" alignItems="center" gap={2} width={e.props.bodyColumns}>
+        <Box flexDirection="row" alignItems="center" gap={2} width={width}>
           <Text dimColor>SkillManager</Text>
           <Text dimColor>every installed skill loads here</Text>
           <Box flexGrow={1} />
@@ -65,7 +67,7 @@ export const register: Register = on => {
 
     const last = s.days === null ? 'never run' : `last ${s.days} days ago`
     return (
-      <Box flexDirection="row" alignItems="center" gap={2} width={e.props.bodyColumns}>
+      <Box flexDirection="row" alignItems="center" gap={2} width={width}>
         {s.pending > 0 && <Text>{s.pending} {s.pending === 1 ? 'update' : 'updates'}</Text>}
         {s.due && <Text color="warning">update pass due</Text>}
         {s.due && <Text dimColor>{last}</Text>}
